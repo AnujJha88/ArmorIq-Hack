@@ -1,0 +1,41 @@
+[
+  {
+    "id": "emp_001",
+    "name": "Sarah Connor",
+    "role": "L5",
+    "department": "Engineering",
+    "manager_id": "emp_000",
+    "email": "sarah@company.com",
+    "start_date": "2024-01-15",
+    "accrued_pto": 15,
+    "visa_status": "Citizen",
+    "visa_expiry": null,
+    "trainings_completed": ["Security 101"]
+  },
+  {
+    "id": "emp_002",
+    "name": "John Wick",
+    "role": "L4",
+    "department": "Security",
+    "manager_id": "emp_001",
+    "email": "john@company.com",
+    "start_date": "2024-03-01",
+    "accrued_pto": 5,
+    "visa_status": "H1B",
+    "visa_expiry": "2026-06-01",
+    "trainings_completed": []
+  },
+  {
+    "id": "emp_003",
+    "name": "Neo Anderson",
+    "role": "L3",
+    "department": "Engineering",
+    "manager_id": "emp_001",
+    "email": "neo@company.com",
+    "start_date": "2025-01-10",
+    "accrued_pto": 2,
+    "visa_status": "H1B",
+    "visa_expiry": "2025-02-28", 
+    "trainings_completed": []
+  }
+]

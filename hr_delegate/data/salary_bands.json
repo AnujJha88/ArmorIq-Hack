@@ -1,0 +1,31 @@
+{
+  "L3": {
+    "role": "Software Engineer II",
+    "min": 100000,
+    "max": 140000,
+    "equity_min": 500,
+    "equity_max": 2000
+  },
+  "L4": {
+    "role": "Senior Software Engineer",
+    "min": 140000,
+    "max": 180000,
+    "equity_min": 2000,
+    "equity_max": 5000
+  },
+  "L5": {
+    "role": "Staff Software Engineer",
+    "min": 180000,
+    "max": 240000,
+    "equity_min": 5000,
+    "equity_max": 10000
+  },
+  "Sales_L3": {
+    "role": "Account Executive",
+    "min": 80000,
+    "max": 120000,
+    "equity_min": 1000,
+    "equity_max": 3000,
+    "commission_cap": 100000
+  }
+}

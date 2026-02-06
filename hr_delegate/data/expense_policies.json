@@ -1,0 +1,20 @@
+{
+  "Team Dinner": {
+    "limit_per_head": 50,
+    "receipt_required_threshold": 25,
+    "alcohol_allowed": true
+  },
+  "Travel": {
+    "flight_class": "economy",
+    "hotel_limit_nightly": 250,
+    "receipt_required_threshold": 10
+  },
+  "Hardware": {
+    "approval_required": true,
+    "receipt_required_threshold": 0
+  },
+  "Learning": {
+    "yearly_cap": 1500,
+    "approval_required": true
+  }
+}

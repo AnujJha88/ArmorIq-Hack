@@ -1,0 +1,38 @@
+[
+  {
+    "id": "cand_001",
+    "name": "Alice Johnson",
+    "email": "alice.j@gmail.com",
+    "phone": "+1-555-0101",
+    "address": "123 Maple St, San Francisco, CA",
+    "education": "Stanford University",
+    "skills": ["Python", "React", "AWS"],
+    "experience_years": 5,
+    "salary_expectation": 160000,
+    "gender": "Female"
+  },
+  {
+    "id": "cand_002",
+    "name": "Bob Smith",
+    "email": "bob.smith@yahoo.com",
+    "phone": "+1-555-0102",
+    "address": "456 Oak Rd, Austin, TX",
+    "education": "University of Texas",
+    "skills": ["Java", "Spring", "SQL"],
+    "experience_years": 8,
+    "salary_expectation": 130000,
+    "gender": "Male"
+  },
+  {
+    "id": "cand_003",
+    "name": "Charlie Davis",
+    "email": "charlie.d@hotmail.com",
+    "phone": "+1-555-0103",
+    "address": "789 Pine Ln, New York, NY",
+    "education": "NYU",
+    "skills": ["JavaScript", "Node.js", "Docker"],
+    "experience_years": 3,
+    "salary_expectation": 110000,
+    "gender": "Non-binary"
+  }
+]
