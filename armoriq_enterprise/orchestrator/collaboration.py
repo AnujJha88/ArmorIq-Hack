@@ -426,18 +426,22 @@ class CollaborationHub:
                     shared_goal=goal,
                 )
 
-                if result.get("resolution_possible", False):
+                if result and result.get("resolution_possible", False):
                     # Agreement reached
                     negotiation.status = NegotiationStatus.AGREED
                     negotiation.agreement = result.get("compromise", {})
+                    compromise = result.get("compromise", {}) or {}
                     negotiation.concessions = {
-                        agent1_id: result.get("compromise", {}).get("agent1_concessions", []),
-                        agent2_id: result.get("compromise", {}).get("agent2_concessions", []),
+                        agent1_id: compromise.get("agent1_concessions", []),
+                        agent2_id: compromise.get("agent2_concessions", []),
                     }
                     break
 
                 # Update positions for next round
-                modified = result.get("compromise", {}).get("modified_parameters", {})
+                if not result:
+                    continue
+                compromise = result.get("compromise", {}) or {}
+                modified = compromise.get("modified_parameters", {})
                 if modified:
                     for agent_id in participants:
                         if agent_id in initial_positions:
