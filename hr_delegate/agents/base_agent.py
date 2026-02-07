@@ -37,6 +37,18 @@ except ImportError:
     RiskLevel = None
     AgentStatus = None
 
+# Observability Integration
+try:
+    from hr_delegate.observability import (
+        get_tracer, get_metrics, get_event_stream,
+        trace_agent_action, trace_tool_execution, AgentEvent
+    )
+    OBSERVABILITY_AVAILABLE = True
+except ImportError:
+    OBSERVABILITY_AVAILABLE = False
+    trace_agent_action = lambda *args, **kwargs: lambda f: f  # No-op decorator
+    trace_tool_execution = lambda f: f
+
 logging.basicConfig(level=logging.INFO, format='[%(name)s] %(message)s')
 
 
@@ -80,14 +92,31 @@ class HRAgent:
         self.is_connected = False
         self._paused = False
         self._killed = False
+        
+        # Observability: Register metrics
+        if OBSERVABILITY_AVAILABLE:
+            self._metrics = get_metrics()
+            self._events = get_event_stream()
+            self.logger.info(f"📊 Observability enabled")
+        else:
+            self._metrics = None
+            self._events = None
 
     def start(self):
         self.is_connected = True
         self.logger.info(f"🟢 {self.name} Agent ONLINE")
+        
+        # Track active agents
+        if self._metrics:
+            self._metrics.gauge("active_agents").inc({"agent": self.name})
 
     def stop(self):
         self.is_connected = False
         self.logger.info(f"🔴 {self.name} Agent OFFLINE")
+        
+        # Track active agents
+        if self._metrics:
+            self._metrics.gauge("active_agents").dec({"agent": self.name})
 
         # Print ArmorIQ summary
         report = self.armoriq.get_audit_report()
@@ -346,6 +375,9 @@ Primary function: {self.primary_intent}
         Returns:
             Dict with 'success', 'result', and optional 'error'
         """
+        import time
+        start_time = time.time()
+        
         # Check if agent can continue
         can_continue, reason = self.check_status()
         if not can_continue:
@@ -356,6 +388,10 @@ Primary function: {self.primary_intent}
         desc = description or f"{self.name} executing {intent_type}"
         
         self.logger.info(f"🔧 Executing tool: {intent_type}")
+        
+        # Track ArmorIQ intent
+        if self._metrics:
+            self._metrics.counter("armoriq_intents_total").inc({"agent": self.name, "mcp": mcp})
         
         # Step 1: Verify intent with ArmorIQ
         result = self.armoriq.capture_intent(intent_type, params, self.name)
@@ -371,6 +407,10 @@ Primary function: {self.primary_intent}
                 policy_triggered=result.policy_triggered
             )
             
+            # Track risk in metrics
+            if self._metrics:
+                self._metrics.gauge("agent_risk_score").set(risk_score, {"agent": self.name})
+            
             if risk_level == RiskLevel.KILL:
                 self._killed = True
                 return {"success": False, "error": "Agent killed by TIRS"}
@@ -381,6 +421,8 @@ Primary function: {self.primary_intent}
         # Step 3: Check if allowed
         if not result.allowed:
             self.logger.warning(f"🛑 Tool blocked: {result.reason}")
+            if self._metrics:
+                self._metrics.counter("armoriq_denials_total").inc({"agent": self.name, "mcp": mcp})
             return {"success": False, "error": result.reason, "policy": result.policy_triggered}
         
         # Step 4: Use modified payload if ArmorIQ modified it
@@ -395,6 +437,9 @@ Primary function: {self.primary_intent}
             intent_token=result.token
         )
         
+        # Calculate duration
+        duration = time.time() - start_time
+        
         # Log the action
         self.action_log.append({
             "timestamp": datetime.now().isoformat(),
@@ -402,11 +447,32 @@ Primary function: {self.primary_intent}
             "action": action,
             "params": final_params,
             "intent_id": result.intent_id,
-            "result": invoke_result
+            "result": invoke_result,
+            "duration_ms": duration * 1000
         })
         
-        if invoke_result.get("status") == "success":
-            self.logger.info(f"✅ Tool executed successfully")
+        # Track metrics
+        success = invoke_result.get("status") == "success"
+        labels = {"agent": self.name, "mcp": mcp, "action": action}
+        
+        if self._metrics:
+            self._metrics.counter("tool_executions_total").inc(labels)
+            self._metrics.histogram("tool_execution_seconds").observe(duration, labels)
+        
+        # Emit observability event
+        if self._events and OBSERVABILITY_AVAILABLE:
+            self._events.emit(AgentEvent(
+                event_type="tool_execution",
+                agent_name=self.name,
+                action=intent_type,
+                duration_ms=duration * 1000,
+                success=success,
+                error=invoke_result.get("error") if not success else None,
+                data={"intent_id": result.intent_id}
+            ))
+        
+        if success:
+            self.logger.info(f"✅ Tool executed successfully ({duration*1000:.0f}ms)")
             return {"success": True, "result": invoke_result.get("result", invoke_result)}
         else:
             return {"success": False, "error": invoke_result.get("error", "Unknown error")}
