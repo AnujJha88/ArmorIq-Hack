@@ -11,7 +11,7 @@ Usage:
     decision = llm.decide(context, options)
 """
 
-import os
+import os 
 import json
 import logging
 from typing import Dict, List, Any, Optional
@@ -95,7 +95,7 @@ Always be:
 
 When asked to decide between options, respond with JSON containing your choice and reasoning."""
 
-    def __init__(self, api_key: str = None, model: str = "gemini-2.5-flash"):
+    def __init__(self, api_key: str = None, model: str = "gemini-3-flash-preview"):
         self.api_key = api_key or GEMINI_API_KEY
         self.model_name = model
         self.mode = LLMMode.MOCK

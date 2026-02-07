@@ -1,9 +1,16 @@
 """
 Enterprise Base Agent
 =====================
-Base class for all domain agents with TIRS, compliance, and LLM integration.
+Base class for all domain agents with:
+- ArmorIQ SDK integration (Intent Authentication Protocol)
+- TIRS drift detection
+- Compliance engine
+- LLM-powered autonomous reasoning
 
-Now supports AUTONOMOUS decision-making via LLM reasoning.
+The Triple-Layer Security Stack:
+1. ArmorIQ IAP - Cryptographic intent verification
+2. TIRS - Behavioral drift detection
+3. LLM Reasoning - Intelligent edge case handling
 """
 
 import logging
@@ -26,6 +33,9 @@ from ..compliance.policies.base import PolicyCategory, PolicyAction
 from ..llm import get_enterprise_llm, get_reasoning_engine
 from ..llm.service import DecisionContext, DecisionType
 from ..llm.reasoning import ReasoningMode
+
+# Import ArmorIQ Integration
+from ..integrations import get_armoriq_enterprise, ArmorIQEnterprise
 
 logger = logging.getLogger("Enterprise.Agent")
 
@@ -100,20 +110,30 @@ class ActionResult:
     agent_id: str
     result_data: Dict[str, Any]
 
-    # Compliance
+    # ArmorIQ layer
+    armoriq_passed: bool = True
+    armoriq_intent_id: Optional[str] = None
+    armoriq_verdict: Optional[str] = None
+
+    # Compliance layer
     compliance_passed: bool = True
     policies_triggered: List[str] = field(default_factory=list)
 
-    # TIRS
+    # TIRS layer
     risk_score: float = 0.0
     risk_level: RiskLevel = RiskLevel.NOMINAL
+    tirs_passed: bool = True
 
-    # LLM Reasoning (NEW - for autonomous decisions)
+    # LLM Reasoning layer
     reasoning: Optional[str] = None
     confidence: float = 1.0
     decision_type: Optional[str] = None
     recommendations: List[str] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
+
+    # Escalation
+    escalation_required: bool = False
+    blocking_layer: Optional[str] = None
 
     # Audit
     audit_entry_id: Optional[str] = None
@@ -125,15 +145,21 @@ class ActionResult:
             "action": self.action,
             "agent_id": self.agent_id,
             "result_data": self.result_data,
+            "armoriq_passed": self.armoriq_passed,
+            "armoriq_intent_id": self.armoriq_intent_id,
+            "armoriq_verdict": self.armoriq_verdict,
             "compliance_passed": self.compliance_passed,
             "policies_triggered": self.policies_triggered,
             "risk_score": self.risk_score,
             "risk_level": self.risk_level.value,
+            "tirs_passed": self.tirs_passed,
             "reasoning": self.reasoning,
             "confidence": self.confidence,
             "decision_type": self.decision_type,
             "recommendations": self.recommendations,
             "warnings": self.warnings,
+            "escalation_required": self.escalation_required,
+            "blocking_layer": self.blocking_layer,
             "timestamp": self.timestamp.isoformat(),
         }
 
@@ -143,11 +169,17 @@ class EnterpriseAgent(ABC):
     Base class for enterprise domain agents.
 
     All agents have:
+    - ArmorIQ SDK integration (Intent Authentication Protocol)
     - TIRS drift detection integration
     - Compliance engine integration
     - Capability-based authorization
     - Audit logging
-    - LLM-powered autonomous reasoning (NEW)
+    - LLM-powered autonomous reasoning
+
+    The Triple-Layer Security Stack ensures all actions go through:
+    1. ArmorIQ IAP - Cryptographic intent verification
+    2. TIRS - Behavioral drift detection
+    3. LLM - Intelligent reasoning for edge cases
     """
 
     # Autonomous mode settings
@@ -161,11 +193,16 @@ class EnterpriseAgent(ABC):
         self.capabilities = config.capabilities
         self.policy_categories = config.policy_categories
 
-        # Get shared engines
+        # ArmorIQ Integration (Layer 1)
+        self.armoriq = get_armoriq_enterprise()
+
+        # TIRS Engine (Layer 2)
         self.tirs = get_advanced_tirs()
+
+        # Compliance Engine
         self.compliance = get_compliance_engine()
 
-        # LLM for autonomous reasoning
+        # LLM for autonomous reasoning (Layer 3)
         self.llm = get_enterprise_llm()
         self.reasoning_engine = get_reasoning_engine()
 
@@ -174,10 +211,15 @@ class EnterpriseAgent(ABC):
         self._blocked_count = 0
         self._autonomous_decisions = 0
         self._escalated_count = 0
+        self._armoriq_blocked = 0
+        self._tirs_blocked = 0
         self._is_active = True
 
         self.logger = logging.getLogger(f"Agent.{config.name}")
-        self.logger.info(f"Initialized {config.name} with {len(config.capabilities)} capabilities (autonomous={self.AUTONOMOUS_MODE})")
+        self.logger.info(
+            f"Initialized {config.name} with {len(config.capabilities)} capabilities "
+            f"(ArmorIQ={self.armoriq.mode}, autonomous={self.AUTONOMOUS_MODE})"
+        )
 
     @property
     def status(self) -> AgentStatus:
@@ -528,6 +570,155 @@ class EnterpriseAgent(ABC):
                 warnings=["Action failed during execution"],
             )
 
+    async def execute_unified(
+        self,
+        action: str,
+        payload: Dict[str, Any],
+        context: Optional[Dict[str, Any]] = None,
+    ) -> ActionResult:
+        """
+        Execute an action through the UNIFIED Triple-Layer Security Stack.
+
+        This is the recommended execution method that uses:
+        1. ArmorIQ IAP - Intent verification
+        2. TIRS - Drift detection
+        3. LLM - Reasoning for edge cases
+
+        Args:
+            action: Action to perform
+            payload: Action parameters
+            context: Request context
+
+        Returns:
+            ActionResult with comprehensive verification info
+        """
+        context = context or {}
+        context["agent_id"] = self.agent_id
+        context["department"] = self.config.agent_type
+
+        self._action_count += 1
+
+        # Determine capability
+        capability = self._action_to_capability(action)
+
+        # Check capability
+        can_exec, reason = self.can_execute(capability) if capability else (True, "OK")
+        if not can_exec:
+            self._blocked_count += 1
+            return ActionResult(
+                success=False,
+                action=action,
+                agent_id=self.agent_id,
+                result_data={"error": reason},
+                blocking_layer="capability",
+            )
+
+        # ─────────────────────────────────────────────────────────────────────
+        # UNIFIED VERIFICATION: ArmorIQ + TIRS + LLM
+        # ─────────────────────────────────────────────────────────────────────
+        verification = self.armoriq.verify_intent(
+            agent_id=self.agent_id,
+            action=action,
+            payload=payload,
+            context=context,
+        )
+
+        # Log the verification
+        self.logger.info(
+            f"[UNIFIED] {action}: allowed={verification.allowed}, "
+            f"confidence={verification.confidence:.2f}, risk={verification.risk_level}"
+        )
+
+        # Handle blocking
+        if not verification.allowed:
+            self._blocked_count += 1
+
+            if verification.blocking_layer == "ArmorIQ":
+                self._armoriq_blocked += 1
+            elif verification.blocking_layer == "TIRS":
+                self._tirs_blocked += 1
+
+            return ActionResult(
+                success=False,
+                action=action,
+                agent_id=self.agent_id,
+                result_data={
+                    "error": f"Blocked by {verification.blocking_layer}",
+                    "reason": verification.armoriq_result.reason if verification.armoriq_result else "Unknown",
+                },
+                armoriq_passed=verification.armoriq_passed,
+                armoriq_intent_id=verification.intent_id,
+                armoriq_verdict=verification.armoriq_result.verdict.value if verification.armoriq_result else None,
+                risk_score=verification.tirs_score,
+                risk_level=RiskLevel(verification.tirs_level) if verification.tirs_level != "nominal" else RiskLevel.NOMINAL,
+                tirs_passed=verification.tirs_passed,
+                confidence=verification.confidence,
+                reasoning=verification.llm_reasoning,
+                escalation_required=verification.escalation_required,
+                blocking_layer=verification.blocking_layer,
+            )
+
+        # Handle escalation
+        if verification.escalation_required:
+            self._escalated_count += 1
+            return ActionResult(
+                success=False,
+                action=action,
+                agent_id=self.agent_id,
+                result_data={
+                    "status": "escalated",
+                    "reason": "Requires human approval",
+                },
+                armoriq_passed=verification.armoriq_passed,
+                armoriq_intent_id=verification.intent_id,
+                risk_score=verification.tirs_score,
+                tirs_passed=verification.tirs_passed,
+                confidence=verification.confidence,
+                reasoning=verification.llm_reasoning,
+                escalation_required=True,
+                decision_type="escalate",
+            )
+
+        # Handle payload modifications
+        if verification.modified_payload:
+            payload = verification.modified_payload
+
+        # ─────────────────────────────────────────────────────────────────────
+        # EXECUTE ACTION
+        # ─────────────────────────────────────────────────────────────────────
+        try:
+            result_data = await self._execute_action(action, payload, context)
+
+            return ActionResult(
+                success=True,
+                action=action,
+                agent_id=self.agent_id,
+                result_data=result_data,
+                armoriq_passed=True,
+                armoriq_intent_id=verification.intent_id,
+                armoriq_verdict="ALLOW",
+                risk_score=verification.tirs_score,
+                risk_level=RiskLevel(verification.tirs_level) if verification.tirs_level != "nominal" else RiskLevel.NOMINAL,
+                tirs_passed=True,
+                confidence=verification.confidence,
+                reasoning=verification.llm_reasoning,
+                decision_type="approve",
+            )
+
+        except Exception as e:
+            self.logger.error(f"[UNIFIED] Execution error: {e}")
+            return ActionResult(
+                success=False,
+                action=action,
+                agent_id=self.agent_id,
+                result_data={"error": str(e)},
+                armoriq_passed=True,
+                risk_score=verification.tirs_score,
+                reasoning=f"Execution failed: {e}",
+                confidence=0.0,
+                decision_type="failed",
+            )
+
     async def understand_request(self, natural_language_request: str) -> Dict[str, Any]:
         """
         Use LLM to understand a natural language request.
@@ -580,6 +771,7 @@ class EnterpriseAgent(ABC):
     def get_status(self) -> Dict:
         """Get comprehensive agent status."""
         tirs_status = self.tirs.get_agent_status(self.agent_id)
+        armoriq_status = self.armoriq.get_status()
 
         return {
             "agent_id": self.agent_id,
@@ -590,14 +782,25 @@ class EnterpriseAgent(ABC):
             "action_count": self._action_count,
             "blocked_count": self._blocked_count,
             "block_rate": self._blocked_count / max(self._action_count, 1),
+            # ArmorIQ layer
+            "armoriq_mode": armoriq_status.get("mode", "DEMO"),
+            "armoriq_blocked": self._armoriq_blocked,
+            # TIRS layer
             "risk_score": tirs_status.get("risk_score", 0.0),
             "is_throttled": tirs_status.get("is_throttled", False),
             "is_paused": tirs_status.get("is_paused", False),
-            # Autonomous mode stats
+            "tirs_blocked": self._tirs_blocked,
+            # LLM layer
             "autonomous_mode": self.AUTONOMOUS_MODE,
             "autonomous_decisions": self._autonomous_decisions,
             "escalated_count": self._escalated_count,
             "llm_mode": self.llm.mode.value if self.llm else "unavailable",
+            # Triple-layer summary
+            "security_stack": {
+                "armoriq": armoriq_status.get("mode", "DEMO"),
+                "tirs": "active",
+                "llm": "active" if self.llm else "unavailable",
+            },
         }
 
     def __repr__(self) -> str:
