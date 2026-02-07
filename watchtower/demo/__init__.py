@@ -1,5 +1,5 @@
 """
-ArmorIQ Enterprise Demo
+Watchtower Enterprise Demo
 =======================
 Comprehensive demonstration scripts.
 """

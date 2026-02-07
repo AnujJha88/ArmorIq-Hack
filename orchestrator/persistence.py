@@ -43,10 +43,10 @@ class AuditEventType(Enum):
     AGENT_KILLED = "agent_killed"
     AGENT_RESUMED = "agent_resumed"
 
-    # ArmorIQ events
-    ARMORIQ_TOKEN_ISSUED = "armoriq_token_issued"
-    ARMORIQ_TOKEN_VERIFIED = "armoriq_token_verified"
-    ARMORIQ_POLICY_TRIGGERED = "armoriq_policy_triggered"
+    # Watchtower events
+    WATCHTOWER_TOKEN_ISSUED = "watchtower_token_issued"
+    WATCHTOWER_TOKEN_VERIFIED = "watchtower_token_verified"
+    WATCHTOWER_POLICY_TRIGGERED = "watchtower_policy_triggered"
 
     # Approval events
     APPROVAL_REQUESTED = "approval_requested"
@@ -76,7 +76,7 @@ class AuditEvent:
     action: Optional[str] = None
     details: Dict[str, Any] = field(default_factory=dict)
     risk_score: float = 0.0
-    armoriq_token: Optional[str] = None
+    watchtower_token: Optional[str] = None
 
     def to_dict(self) -> Dict:
         return {
@@ -90,7 +90,7 @@ class AuditEvent:
             "action": self.action,
             "details": self.details,
             "risk_score": self.risk_score,
-            "armoriq_token": self.armoriq_token
+            "watchtower_token": self.watchtower_token
         }
 
 
@@ -167,7 +167,7 @@ class StateStore:
                     started_at TEXT,
                     completed_at TEXT,
                     risk_score REAL DEFAULT 0.0,
-                    armoriq_token TEXT,
+                    watchtower_token TEXT,
                     FOREIGN KEY (pipeline_id) REFERENCES pipelines(pipeline_id)
                 )
             """)
@@ -185,7 +185,7 @@ class StateStore:
                     action TEXT,
                     details JSON,
                     risk_score REAL DEFAULT 0.0,
-                    armoriq_token TEXT
+                    watchtower_token TEXT
                 )
             """)
 
@@ -225,9 +225,9 @@ class StateStore:
                 )
             """)
 
-            # ArmorIQ tokens table
+            # Watchtower tokens table
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS armoriq_tokens (
+                CREATE TABLE IF NOT EXISTS watchtower_tokens (
                     token_id TEXT PRIMARY KEY,
                     pipeline_id TEXT,
                     task_id TEXT,
@@ -344,7 +344,7 @@ class StateStore:
             cursor.execute("""
                 INSERT OR REPLACE INTO tasks
                 (task_id, pipeline_id, name, capability, agent_id, status, payload, result,
-                 started_at, completed_at, risk_score, armoriq_token)
+                 started_at, completed_at, risk_score, watchtower_token)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 task_id,
@@ -358,7 +358,7 @@ class StateStore:
                 data.get("started_at"),
                 data.get("completed_at"),
                 data.get("risk_score", 0.0),
-                data.get("armoriq_token")
+                data.get("watchtower_token")
             ))
 
     def get_tasks_for_pipeline(self, pipeline_id: str) -> List[Dict]:
@@ -382,7 +382,7 @@ class StateStore:
             cursor.execute("""
                 INSERT INTO audit_log
                 (event_id, event_type, timestamp, pipeline_id, task_id, agent_id,
-                 user_id, action, details, risk_score, armoriq_token)
+                 user_id, action, details, risk_score, watchtower_token)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 event.event_id,
@@ -395,7 +395,7 @@ class StateStore:
                 event.action,
                 json.dumps(event.details),
                 event.risk_score,
-                event.armoriq_token
+                event.watchtower_token
             ))
 
     def get_audit_log(
@@ -526,15 +526,15 @@ class StateStore:
             return [dict(row) for row in cursor.fetchall()]
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # ARMORIQ TOKEN OPERATIONS
+    # WATCHTOWER TOKEN OPERATIONS
     # ═══════════════════════════════════════════════════════════════════════════
 
-    def save_armoriq_token(self, token_id: str, data: Dict):
-        """Save ArmorIQ token."""
+    def save_watchtower_token(self, token_id: str, data: Dict):
+        """Save Watchtower token."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT OR REPLACE INTO armoriq_tokens
+                INSERT OR REPLACE INTO watchtower_tokens
                 (token_id, pipeline_id, task_id, agent_id, plan_hash, action,
                  issued_at, verified_at, status, details)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -556,7 +556,7 @@ class StateStore:
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT * FROM armoriq_tokens WHERE pipeline_id = ? ORDER BY issued_at",
+                "SELECT * FROM watchtower_tokens WHERE pipeline_id = ? ORDER BY issued_at",
                 (pipeline_id,)
             )
             return [dict(row) for row in cursor.fetchall()]
@@ -633,7 +633,7 @@ class AuditLogger:
         action: str = None,
         details: Dict = None,
         risk_score: float = 0.0,
-        armoriq_token: str = None
+        watchtower_token: str = None
     ):
         """Log an audit event."""
         event = AuditEvent(
@@ -647,7 +647,7 @@ class AuditLogger:
             action=action,
             details=details or {},
             risk_score=risk_score,
-            armoriq_token=armoriq_token
+            watchtower_token=watchtower_token
         )
         self.store.log_event(event)
         return event
@@ -688,7 +688,7 @@ class AuditLogger:
             agent_id=agent_id,
             details=result,
             risk_score=result.get("risk_score", 0.0),
-            armoriq_token=result.get("armoriq_token")
+            watchtower_token=result.get("watchtower_token")
         )
 
     def log_task_blocked(self, pipeline_id: str, task_id: str, agent_id: str, reason: str, policy: str):
@@ -701,14 +701,14 @@ class AuditLogger:
             details={"reason": reason, "policy": policy}
         )
 
-    def log_armoriq_token(self, pipeline_id: str, task_id: str, agent_id: str, token_id: str, plan_hash: str):
-        """Log ArmorIQ token issuance."""
+    def log_watchtower_token(self, pipeline_id: str, task_id: str, agent_id: str, token_id: str, plan_hash: str):
+        """Log Watchtower token issuance."""
         return self.log(
-            AuditEventType.ARMORIQ_TOKEN_ISSUED,
+            AuditEventType.WATCHTOWER_TOKEN_ISSUED,
             pipeline_id=pipeline_id,
             task_id=task_id,
             agent_id=agent_id,
-            armoriq_token=token_id,
+            watchtower_token=token_id,
             details={"plan_hash": plan_hash}
         )
 

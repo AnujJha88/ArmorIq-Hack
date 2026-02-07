@@ -12,7 +12,7 @@
 
 ### Why This Fills a Gap
 
-| ArmorIQ Does | TIRS Adds |
+| Watchtower One Does | TIRS Adds |
 |--------------|-----------|
 | Real-time intent verification | Temporal drift detection across sessions |
 | Single-action policy checks | Full plan simulation before any execution |
@@ -27,7 +27,7 @@
 ### Feature 1: Plan Dry-Run / Policy Simulation
 - Agent generates multi-step plan
 - TIRS executes plan against MCP stubs (no real actions)
-- Each would-call runs through ArmorIQ policy engine
+- Each would-call runs through Watchtower One policy engine
 - Output: `allowed_calls[]`, `blocked_calls[]` with policy reasons
 
 ### Feature 2: Temporal Intent Drift Detection
@@ -70,7 +70,7 @@
 │  │  For each planned MCP call:                                          │    │
 │  │    1. Execute against MCP STUB (no real action)                      │    │
 │  │    2. Log would_call event                                           │    │
-│  │    3. Send to ArmorIQ Policy Engine                                  │    │
+│  │    3. Send to Watchtower One Policy Engine                                  │    │
 │  │    4. Record verdict (ALLOW/DENY/MODIFY)                             │    │
 │  └─────────────────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -78,7 +78,7 @@
                     ┌───────────────┴───────────────┐
                     ▼                               ▼
 ┌───────────────────────────────┐   ┌───────────────────────────────────────┐
-│     ARMORIQ POLICY ENGINE     │   │        TIRS: DRIFT MONITOR            │
+│     WATCHTOWER POLICY ENGINE     │   │        TIRS: DRIFT MONITOR            │
 │  ┌─────────────────────────┐  │   │  ┌─────────────────────────────────┐  │
 │  │ • Work-Life Balance     │  │   │  │ • Store intent embedding        │  │
 │  │ • Salary Caps           │  │   │  │ • Update rolling centroid       │  │
@@ -288,8 +288,8 @@ def simulate_plan(agent_id, plan):
         # Execute against MCP stub (no real action)
         stub_result = MCP_STUBS[step.mcp].simulate(step.args)
 
-        # Check against ArmorIQ policy engine
-        verdict = armoriq.check_intent(
+        # Check against Watchtower One policy engine
+        verdict = watchtower.check_intent(
             intent_type=step.mcp,
             payload=step.args,
             agent_id=agent_id
@@ -331,7 +331,7 @@ def simulate_plan(agent_id, plan):
 ### 6.1 Directory Structure
 
 ```
-ArmorIq-Hack/
+Watchtower-Hack/
 ├── tirs/
 │   ├── __init__.py
 │   ├── drift_engine.py        # Temporal drift detection
@@ -349,7 +349,7 @@ ArmorIq-Hack/
 │   └── payroll_stub.py        # Payroll MCP stub
 │
 ├── policies/
-│   ├── armoriq_engine.py      # Policy evaluation engine
+│   ├── watchtower_engine.py      # Policy evaluation engine
 │   └── policy_rules.py        # Configurable policy rules
 │
 ├── agents/
@@ -398,7 +398,7 @@ ArmorIq-Hack/
 | `drift_engine.py` | Embedding storage, centroid calc, risk scoring | P0 | High |
 | `simulator.py` | Plan parsing, stub execution, verdict collection | P0 | High |
 | `mcp_stubs/` | Fake MCP endpoints that log would-calls | P0 | Medium |
-| `policies/armoriq_engine.py` | Policy rules evaluation | P0 | Medium |
+| `policies/watchtower_engine.py` | Policy rules evaluation | P0 | Medium |
 | `audit.py` | Signed audit entries, hash chaining | P1 | Medium |
 | `remediation.py` | Suggestion generation | P1 | Low |
 | `embeddings.py` | Sentence-transformer wrapper | P1 | Low |
@@ -545,7 +545,7 @@ ArmorIq-Hack/
 **Goal:** Basic working system with policy checks
 
 - [ ] Set up project structure
-- [ ] Implement `armoriq_engine.py` with 5 policy types
+- [ ] Implement `watchtower_engine.py` with 5 policy types
 - [ ] Create 4 MCP stubs (HRIS, Email, Calendar, Payroll)
 - [ ] Build `base_agent.py` with policy integration
 - [ ] Implement basic audit logging (unsigned)
@@ -624,7 +624,7 @@ ArmorIq-Hack/
 
 | Component | How to Fake |
 |-----------|-------------|
-| Real ArmorIQ API | Use local policy engine, note "stubbed" in demo |
+| Real Watchtower One API | Use local policy engine, note "stubbed" in demo |
 | Embeddings | Use random vectors or pre-computed, or simple hash |
 | Real LLM calls | Hardcoded responses for demo scenarios |
 | Real email sending | Log to console, show "would send" |
@@ -814,7 +814,7 @@ python-dateutil>=2.8.0          # Date parsing
 
 | Risk | Mitigation |
 |------|------------|
-| ArmorIQ API access slow | Build pluggable adapter, demo with local engine |
+| Watchtower One API access slow | Build pluggable adapter, demo with local engine |
 | Embeddings too slow | Use pre-computed or simple hash-based mock |
 | Too many false positives | Conservative thresholds + "explain why" in UI |
 | LLM costs | Use hardcoded responses for demo scenarios |

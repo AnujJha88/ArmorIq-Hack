@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-ArmorIQ Unified Demo
+Watchtower Unified Demo
 ====================
 Demonstrates the Triple-Layer Security Stack:
-1. ArmorIQ SDK - Intent Authentication Protocol (IAP)
+1. Watchtower SDK - Intent Authentication Protocol (IAP)
 2. TIRS - Temporal Intent Risk & Simulation (Drift Detection)
 3. LLM - Autonomous reasoning for edge cases
 
-This is the flagship demo showing how ArmorIQ + TIRS + LLM work together.
+This is the flagship demo showing how Watchtower + TIRS + LLM work together.
 """
 
 import asyncio
@@ -18,8 +18,8 @@ from pathlib import Path
 # Add project to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from armoriq_enterprise.integrations import get_armoriq_enterprise
-from armoriq_enterprise.agents import FinanceAgent
+from watchtower.integrations import get_watchtower
+from watchtower.agents import FinanceAgent
 
 # Configure logging
 logging.basicConfig(
@@ -49,17 +49,17 @@ def print_result(name: str, result):
         print(json.dumps(result, indent=2, default=str))
 
 
-async def demo_armoriq_layer():
-    """Demo: ArmorIQ Intent Verification Layer."""
-    print_banner("LAYER 1: ArmorIQ Intent Authentication Protocol")
+async def demo_watchtower_layer():
+    """Demo: Watchtower Intent Verification Layer."""
+    print_banner("LAYER 1: Watchtower Intent Authentication Protocol")
 
-    armoriq = get_armoriq_enterprise()
+    watchtower = get_watchtower()
 
-    print(f"Mode: {armoriq.mode}")
-    print(f"Project: {armoriq.project_id}")
+    print(f"Mode: {watchtower.mode}")
+    print(f"Project: {watchtower.project_id}")
     print()
 
-    # Test cases for ArmorIQ policy verification
+    # Test cases for Watchtower policy verification
     test_cases = [
         {
             "name": "Low-value expense (should ALLOW)",
@@ -104,7 +104,7 @@ async def demo_armoriq_layer():
         print(f"  Agent: {test['agent']}")
         print(f"  Action: {test['action']}")
 
-        result = armoriq.capture_intent(
+        result = watchtower.capture_intent(
             action_type=test["action"],
             payload=test["payload"],
             agent_name=test["agent"],
@@ -122,9 +122,9 @@ async def demo_unified_verification():
     """Demo: Full Triple-Layer Verification."""
     print_banner("UNIFIED: Triple-Layer Security Stack")
 
-    armoriq = get_armoriq_enterprise()
+    watchtower = get_watchtower()
 
-    print("Testing unified verification (ArmorIQ + TIRS + LLM)...")
+    print("Testing unified verification (Watchtower + TIRS + LLM)...")
     print()
 
     # Test unified verification
@@ -160,7 +160,7 @@ async def demo_unified_verification():
         print(f"Test: {test['name']}")
         print(f"{'='*60}")
 
-        result = armoriq.verify_intent(
+        result = watchtower.verify_intent(
             agent_id=test["agent_id"],
             action=test["action"],
             payload=test["payload"],
@@ -172,7 +172,7 @@ async def demo_unified_verification():
         print(f"  Risk Level: {result.risk_level}")
         print()
         print("  Layer Results:")
-        print(f"    ArmorIQ: {'PASS' if result.armoriq_passed else 'FAIL'}")
+        print(f"    Watchtower: {'PASS' if result.watchtower_passed else 'FAIL'}")
         print(f"    TIRS: score={result.tirs_score:.2f}, level={result.tirs_level}, {'PASS' if result.tirs_passed else 'FAIL'}")
         print(f"    LLM: recommendation={result.llm_recommendation}, confidence={result.llm_confidence:.2f}")
 
@@ -190,7 +190,7 @@ async def demo_agent_execution():
     agent = FinanceAgent()
 
     print(f"Created agent: {agent.agent_id}")
-    print(f"ArmorIQ Mode: {agent.armoriq.mode}")
+    print(f"Watchtower Mode: {agent.watchtower.mode}")
     print()
 
     # Test execute_unified
@@ -218,7 +218,7 @@ async def demo_agent_execution():
         )
 
         print(f"\n  Success: {result.success}")
-        print(f"  ArmorIQ: passed={result.armoriq_passed}, intent_id={result.armoriq_intent_id}")
+        print(f"  Watchtower: passed={result.watchtower_passed}, intent_id={result.watchtower_intent_id}")
         print(f"  TIRS: score={result.risk_score:.2f}, level={result.risk_level.value}")
         print(f"  Confidence: {result.confidence:.2f}")
 
@@ -233,7 +233,7 @@ async def demo_agent_execution():
     status = agent.get_status()
     print(f"  Actions: {status['action_count']}")
     print(f"  Blocked: {status['blocked_count']}")
-    print(f"  ArmorIQ Blocked: {status['armoriq_blocked']}")
+    print(f"  Watchtower Blocked: {status['watchtower_blocked']}")
     print(f"  TIRS Blocked: {status['tirs_blocked']}")
     print(f"  Security Stack: {status['security_stack']}")
 
@@ -242,8 +242,8 @@ async def demo_audit_report():
     """Demo: Audit reporting."""
     print_banner("AUDIT REPORT")
 
-    armoriq = get_armoriq_enterprise()
-    report = armoriq.get_audit_report()
+    watchtower = get_watchtower()
+    report = watchtower.get_audit_report()
 
     print(f"Project: {report['project']}")
     print(f"Mode: {report['mode']}")
@@ -271,18 +271,18 @@ async def demo_audit_report():
 async def main():
     """Run all demos."""
     print("\n" + "=" * 70)
-    print("     ArmorIQ Unified Demo")
+    print("     Watchtower Unified Demo")
     print("     Triple-Layer Security Stack")
     print("=" * 70)
     print("\nThis demo showcases the integration of:")
-    print("  Layer 1: ArmorIQ SDK - Intent Authentication Protocol (IAP)")
+    print("  Layer 1: Watchtower SDK - Intent Authentication Protocol (IAP)")
     print("  Layer 2: TIRS - Temporal Intent Risk & Simulation")
     print("  Layer 3: LLM - Autonomous Reasoning for Edge Cases")
     print()
 
     try:
-        # Layer 1: ArmorIQ alone
-        await demo_armoriq_layer()
+        # Layer 1: Watchtower alone
+        await demo_watchtower_layer()
 
         # Full unified verification
         await demo_unified_verification()
@@ -297,12 +297,12 @@ async def main():
         print("The Triple-Layer Security Stack is fully operational!")
         print()
         print("Summary:")
-        print("  - ArmorIQ: Intent verification with local policy engine (DEMO mode)")
+        print("  - Watchtower: Intent verification with local policy engine (DEMO mode)")
         print("  - TIRS: Behavioral drift detection active")
         print("  - LLM: Autonomous reasoning for edge cases")
         print()
-        print("To enable LIVE ArmorIQ mode, set:")
-        print("  export ARMORIQ_API_KEY=ak_live_xxx")
+        print("To enable LIVE Watchtower mode, set:")
+        print("  export WATCHTOWER_API_KEY=ak_live_xxx")
         print()
 
     except Exception as e:

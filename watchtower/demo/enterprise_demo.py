@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-ArmorIQ Enterprise Demo
+Watchtower Enterprise Demo
 =======================
-Comprehensive demonstration of the ArmorIQ Enterprise Agentic System.
+Comprehensive demonstration of the Watchtower Enterprise Agentic System.
 
 This demo showcases:
 1. Advanced TIRS Drift Detection (THE STAR)
@@ -12,7 +12,7 @@ This demo showcases:
 5. Risk escalation scenarios
 6. Forensic investigation capabilities
 
-Run with: python -m armoriq_enterprise.demo.enterprise_demo
+Run with: python -m watchtower.demo.enterprise_demo
 """
 
 import asyncio
@@ -103,7 +103,7 @@ async def demo_gateway_initialization():
 
     print_header("ENTERPRISE GATEWAY INITIALIZATION")
 
-    print_info("Initializing ArmorIQ Enterprise Gateway...")
+    print_info("Initializing Watchtower Enterprise Gateway...")
     print_info("This creates all domain agents and workflow templates.")
     print()
 
@@ -493,7 +493,7 @@ async def run_full_demo():
     print(f"{Colors.BOLD}{Colors.HEADER}")
     print("╔══════════════════════════════════════════════════════════════════════╗")
     print("║                                                                      ║")
-    print("║         ARMORIQ ENTERPRISE AGENTIC SYSTEM DEMONSTRATION              ║")
+    print("║         WATCHTOWER ENTERPRISE AGENTIC SYSTEM DEMONSTRATION              ║")
     print("║                                                                      ║")
     print("║  Advanced TIRS Drift Detection • 6 Domain Agents • Compliance        ║")
     print("║                                                                      ║")
@@ -550,7 +550,7 @@ async def run_full_demo():
 async def run_quick_demo():
     """Run a shorter demo for quick validation."""
     print()
-    print(f"{Colors.BOLD}ArmorIQ Enterprise - Quick Validation{Colors.ENDC}")
+    print(f"{Colors.BOLD}Watchtower Enterprise - Quick Validation{Colors.ENDC}")
     print()
 
     from ..orchestrator import initialize_gateway
@@ -580,7 +580,7 @@ def main():
     """Main entry point."""
     import argparse
 
-    parser = argparse.ArgumentParser(description="ArmorIQ Enterprise Demo")
+    parser = argparse.ArgumentParser(description="Watchtower Enterprise Demo")
     parser.add_argument(
         "--quick",
         action="store_true",

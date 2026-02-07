@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-ArmorIQ Developer Demo
+Watchtower Developer Demo
 ======================
-Shows exactly what code runs, what gets sent to ArmorIQ, and what comes back.
+Shows exactly what code runs, what gets sent to Watchtower, and what comes back.
 """
 
 import sys
@@ -51,7 +51,7 @@ def code_block(title, code):
     print(f"{C.YELLOW}└{'─'*78}┘{C.END}")
 
 def request_block(method, url, payload):
-    print(f"\n{C.BLUE}▶ REQUEST TO ARMORIQ{C.END}")
+    print(f"\n{C.BLUE}▶ REQUEST TO WATCHTOWER{C.END}")
     print(f"{C.BLUE}┌{'─'*78}┐{C.END}")
     print(f"{C.BLUE}│{C.END} {C.BOLD}{method}{C.END} {url}")
     print(f"{C.BLUE}│{C.END}")
@@ -62,7 +62,7 @@ def request_block(method, url, payload):
 
 def response_block(status, data):
     color = C.GREEN if status == 200 else C.RED
-    print(f"\n{color}◀ ARMORIQ RESPONSE{C.END}")
+    print(f"\n{color}◀ WATCHTOWER RESPONSE{C.END}")
     print(f"{color}┌{'─'*78}┐{C.END}")
     print(f"{color}│{C.END} Status: {C.BOLD}{status}{C.END}")
     print(f"{color}│{C.END}")
@@ -85,33 +85,33 @@ def divider():
     print(f"\n{C.GRAY}{'─'*80}{C.END}\n")
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# MOCK ARMORIQ CLIENT FOR VISIBILITY
+# MOCK WATCHTOWER CLIENT FOR VISIBILITY
 # ═══════════════════════════════════════════════════════════════════════════════
 
-class DevArmorIQClient:
-    """Wrapper that shows all ArmorIQ API interactions."""
+class DevWatchtowerClient:
+    """Wrapper that shows all Watchtower API interactions."""
 
     def __init__(self):
-        self.api_key = os.getenv("ARMORIQ_API_KEY", "")
-        self.backend = "https://customer-api.armoriq.ai"
-        self.iap_endpoint = os.getenv("ARMORIQ_IAP_ENDPOINT", "https://iap.armoriq.ai")
+        self.api_key = os.getenv("WATCHTOWER_API_KEY", "")
+        self.backend = "https://customer-api.watchtower.io"
+        self.iap_endpoint = os.getenv("WATCHTOWER_IAP_ENDPOINT", "https://iap.watchtower.io")
 
         # Try to import real SDK
         self.real_client = None
         try:
-            from armoriq_sdk import ArmorIQClient
+            from watchtower_sdk import WatchtowerClient
             if self.api_key.startswith("ak_"):
-                self.real_client = ArmorIQClient(
+                self.real_client = WatchtowerClient(
                     api_key=self.api_key,
-                    user_id=os.getenv("ARMORIQ_USER_ID", "dev-demo"),
-                    agent_id=os.getenv("ARMORIQ_AGENT_ID", "dev-agent")
+                    user_id=os.getenv("WATCHTOWER_USER_ID", "dev-demo"),
+                    agent_id=os.getenv("WATCHTOWER_AGENT_ID", "dev-agent")
                 )
-                print(f"{C.GREEN}✓ ArmorIQ SDK connected (LIVE MODE){C.END}")
+                print(f"{C.GREEN}✓ Watchtower SDK connected (LIVE MODE){C.END}")
                 print(f"{C.GRAY}  API Key: {self.api_key[:15]}...{self.api_key[-8:]}{C.END}")
             else:
                 print(f"{C.YELLOW}⚠ No valid API key - using mock responses{C.END}")
         except ImportError:
-            print(f"{C.YELLOW}⚠ armoriq-sdk not installed - using mock responses{C.END}")
+            print(f"{C.YELLOW}⚠ watchtower-sdk not installed - using mock responses{C.END}")
 
     def capture_and_verify(self, action: str, payload: dict, agent: str) -> dict:
         """Show the full flow of capturing and verifying an intent."""
@@ -127,17 +127,17 @@ class DevArmorIQClient:
         }
 
         code_block("YOUR CODE - Building Plan", f"""
-armoriq = ArmorIQWrapper()
+watchtower = WatchtowerWrapper()
 
 # Define what the agent wants to do
-result = armoriq.capture_intent(
+result = watchtower.capture_intent(
     action_type="{action}",
     payload={json.dumps(payload, indent=8)},
     agent_name="{agent}"
 )
 """)
 
-        # Step 2: Show request to ArmorIQ
+        # Step 2: Show request to Watchtower
         request_payload = {
             "llm": agent,
             "prompt": f"Execute {action}",
@@ -146,7 +146,7 @@ result = armoriq.capture_intent(
 
         request_block("POST", f"{self.backend}/iap/sdk/token", request_payload)
 
-        # Step 3: Get response from ArmorIQ (real or mock)
+        # Step 3: Get response from Watchtower (real or mock)
         if self.real_client:
             try:
                 plan = self.real_client.capture_plan(
@@ -184,7 +184,7 @@ result = armoriq.capture_intent(
         return result
 
     def _evaluate_local_policy(self, action: str, payload: dict) -> dict:
-        """Evaluate against local policies (same as ArmorIQWrapper)."""
+        """Evaluate against local policies (same as WatchtowerWrapper)."""
 
         # Work-Life Balance
         if action in ["schedule_interview", "book_meeting"]:
@@ -300,20 +300,20 @@ def main():
 {C.BOLD}{C.CYAN}
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                              ║
-║   ArmorIQ Developer Demo                                                     ║
+║   Watchtower Developer Demo                                                     ║
 ║   ──────────────────────                                                     ║
 ║                                                                              ║
 ║   This demo shows:                                                           ║
 ║   • Your code (what you write)                                               ║
-║   • Request to ArmorIQ API (what gets sent)                                  ║
-║   • Response from ArmorIQ (what comes back)                                  ║
+║   • Request to Watchtower API (what gets sent)                                  ║
+║   • Response from Watchtower (what comes back)                                  ║
 ║   • Local policy evaluation (business rules)                                 ║
 ║                                                                              ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 {C.END}
 """)
 
-    client = DevArmorIQClient()
+    client = DevWatchtowerClient()
 
     wait("Press Enter to start demo...")
 
@@ -433,9 +433,9 @@ def main():
 ║  │  YOUR CODE                                                             │  ║
 ║  │    │                                                                   │  ║
 ║  │    ▼                                                                   │  ║
-║  │  armoriq.capture_intent(action, payload, agent)                        │  ║
+║  │  watchtower.capture_intent(action, payload, agent)                        │  ║
 ║  │    │                                                                   │  ║
-║  │    ├──► ArmorIQ SDK builds plan structure                              │  ║
+║  │    ├──► Watchtower SDK builds plan structure                              │  ║
 ║  │    │                                                                   │  ║
 ║  │    ├──► POST /iap/sdk/token  (get cryptographic intent token)          │  ║
 ║  │    │         ▲                                                         │  ║

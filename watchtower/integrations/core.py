@@ -1,14 +1,14 @@
 """
-ArmorIQ Enterprise Integration
+Watchtower Enterprise Integration
 ==============================
 Unified verification layer combining:
-1. ArmorIQ SDK - Intent Authentication Protocol (IAP)
+1. Watchtower SDK - Intent Authentication Protocol (IAP)
 2. TIRS - Temporal Intent Risk & Simulation (Drift Detection)
 3. LLM Reasoning - Autonomous decision making for edge cases
 
 The Triple-Layer Security Stack:
 ┌─────────────────────────────────────────────────────────────┐
-│  Layer 1: ArmorIQ IAP                                       │
+│  Layer 1: Watchtower IAP                                       │
 │  - Cryptographic intent verification                        │
 │  - Policy enforcement at the protocol level                 │
 ├─────────────────────────────────────────────────────────────┤
@@ -23,8 +23,8 @@ The Triple-Layer Security Stack:
 │  - Confidence scoring                                       │
 └─────────────────────────────────────────────────────────────┘
 
-Install: pip install armoriq-sdk
-Get API Key: https://platform.armoriq.ai/dashboard/api-keys
+Install: pip install watchtower-sdk
+Get API Key: https://platform.watchtower.io/dashboard/api-keys
 """
 
 import os
@@ -36,23 +36,23 @@ from datetime import datetime
 from dataclasses import dataclass, field
 from enum import Enum
 
-logger = logging.getLogger("Enterprise.ArmorIQ")
+logger = logging.getLogger("Enterprise.Watchtower")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # CONFIGURATION
 # ═══════════════════════════════════════════════════════════════════════════════
 
-ARMORIQ_API_KEY = os.getenv("ARMORIQ_API_KEY")
-ARMORIQ_IAP_ENDPOINT = os.getenv("ARMORIQ_IAP_ENDPOINT", "https://iap.armoriq.ai")
-ARMORIQ_PROXY_ENDPOINT = os.getenv("ARMORIQ_PROXY_ENDPOINT", "https://proxy.armoriq.ai")
-ARMORIQ_USER_ID = os.getenv("ARMORIQ_USER_ID", "enterprise-system")
-ARMORIQ_AGENT_ID = os.getenv("ARMORIQ_AGENT_ID", "enterprise-agent")
+WATCHTOWER_API_KEY = os.getenv("WATCHTOWER_API_KEY")
+WATCHTOWER_IAP_ENDPOINT = os.getenv("WATCHTOWER_IAP_ENDPOINT", "https://iap.watchtower.io")
+WATCHTOWER_PROXY_ENDPOINT = os.getenv("WATCHTOWER_PROXY_ENDPOINT", "https://proxy.watchtower.io")
+WATCHTOWER_USER_ID = os.getenv("WATCHTOWER_USER_ID", "enterprise-system")
+WATCHTOWER_AGENT_ID = os.getenv("WATCHTOWER_AGENT_ID", "enterprise-agent")
 
-# Try to import ArmorIQ SDK
+# Try to import Watchtower SDK
 try:
-    from armoriq_sdk import (
-        ArmorIQClient,
+    from watchtower_sdk import (
+        WatchtowerClient,
         IntentMismatchException,
         InvalidTokenException,
         TokenExpiredException,
@@ -60,15 +60,15 @@ try:
         PlanCapture,
         IntentToken
     )
-    ARMORIQ_SDK_AVAILABLE = True
-    logger.info("ArmorIQ SDK v0.2.6 loaded")
+    WATCHTOWER_SDK_AVAILABLE = True
+    logger.info("Watchtower SDK v0.2.6 loaded")
 except ImportError:
-    ARMORIQ_SDK_AVAILABLE = False
-    logger.warning("armoriq-sdk not installed. Run: pip install armoriq-sdk")
+    WATCHTOWER_SDK_AVAILABLE = False
+    logger.warning("watchtower-sdk not installed. Run: pip install watchtower-sdk")
 
 
 class PolicyVerdict(Enum):
-    """ArmorIQ policy verdicts."""
+    """Watchtower policy verdicts."""
     ALLOW = "ALLOW"
     DENY = "DENY"
     MODIFY = "MODIFY"
@@ -77,7 +77,7 @@ class PolicyVerdict(Enum):
 
 @dataclass
 class IntentResult:
-    """Result from ArmorIQ intent verification."""
+    """Result from Watchtower intent verification."""
     intent_id: str
     allowed: bool
     verdict: PolicyVerdict
@@ -93,16 +93,16 @@ class IntentResult:
 class UnifiedVerificationResult:
     """
     Result from the unified verification stack.
-    Combines ArmorIQ + TIRS + LLM results.
+    Combines Watchtower + TIRS + LLM results.
     """
     # Overall decision
     allowed: bool
     confidence: float
     risk_level: str
 
-    # ArmorIQ layer
-    armoriq_result: Optional[IntentResult] = None
-    armoriq_passed: bool = True
+    # Watchtower layer
+    watchtower_result: Optional[IntentResult] = None
+    watchtower_passed: bool = True
 
     # TIRS layer
     tirs_score: float = 0.0
@@ -119,6 +119,13 @@ class UnifiedVerificationResult:
     escalation_required: bool = False
     modified_payload: Optional[Dict] = None
 
+    # Layer health status - indicates which security layers are active
+    layers_active: Dict[str, bool] = field(default_factory=lambda: {
+        "watchtower": True,
+        "tirs": False,
+        "llm": False,
+    })
+
     # Audit
     intent_id: str = ""
     timestamp: datetime = field(default_factory=datetime.now)
@@ -128,7 +135,7 @@ class UnifiedVerificationResult:
             "allowed": self.allowed,
             "confidence": self.confidence,
             "risk_level": self.risk_level,
-            "armoriq_passed": self.armoriq_passed,
+            "watchtower_passed": self.watchtower_passed,
             "tirs_score": self.tirs_score,
             "tirs_level": self.tirs_level,
             "tirs_passed": self.tirs_passed,
@@ -136,6 +143,7 @@ class UnifiedVerificationResult:
             "llm_recommendation": self.llm_recommendation,
             "blocking_layer": self.blocking_layer,
             "escalation_required": self.escalation_required,
+            "layers_active": self.layers_active,
             "intent_id": self.intent_id,
             "timestamp": self.timestamp.isoformat(),
         }
@@ -148,7 +156,7 @@ class UnifiedVerificationResult:
 class LocalPolicyEngine:
     """
     Local policy engine for demo mode.
-    Simulates ArmorIQ policy enforcement when SDK credentials unavailable.
+    Simulates Watchtower policy enforcement when SDK credentials unavailable.
     """
 
     POLICIES = {
@@ -446,40 +454,40 @@ class LocalPolicyEngine:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# ARMORIQ ENTERPRISE INTEGRATION
+# WATCHTOWER ENTERPRISE INTEGRATION
 # ═══════════════════════════════════════════════════════════════════════════════
 
-class ArmorIQEnterprise:
+class WatchtowerOne:
     """
-    ArmorIQ Enterprise Integration
+    Watchtower Enterprise Integration
     ==============================
 
     Unified verification layer combining:
-    1. ArmorIQ SDK - Intent Authentication Protocol (IAP)
+    1. Watchtower SDK - Intent Authentication Protocol (IAP)
     2. TIRS - Temporal Intent Risk & Simulation (Drift Detection)
     3. LLM Reasoning - Autonomous decision making for edge cases
 
     The Triple-Layer Security Stack ensures:
-    - Cryptographic intent verification (ArmorIQ)
+    - Cryptographic intent verification (Watchtower)
     - Behavioral drift detection (TIRS)
     - Intelligent reasoning for edge cases (LLM)
 
     LIVE MODE (with API key):
-        Uses real ArmorIQ SDK with cryptographic IAP.
-        All actions verified through ArmorIQ before execution.
+        Uses real Watchtower SDK with cryptographic IAP.
+        All actions verified through Watchtower before execution.
 
     DEMO MODE (no API key):
         Uses local policy engine for demonstrations.
-        Simulates ArmorIQ behavior with configurable policies.
+        Simulates Watchtower behavior with configurable policies.
 
     Environment Variables:
-        ARMORIQ_API_KEY - Your ArmorIQ API key (ak_live_* or ak_test_*)
-        ARMORIQ_IAP_ENDPOINT - IAP endpoint
-        ARMORIQ_PROXY_ENDPOINT - Proxy endpoint
-        ARMORIQ_USER_ID - User identifier
-        ARMORIQ_AGENT_ID - Agent identifier
+        WATCHTOWER_API_KEY - Your Watchtower API key (ak_live_* or ak_test_*)
+        WATCHTOWER_IAP_ENDPOINT - IAP endpoint
+        WATCHTOWER_PROXY_ENDPOINT - Proxy endpoint
+        WATCHTOWER_USER_ID - User identifier
+        WATCHTOWER_AGENT_ID - Agent identifier
 
-    Get API Key: https://platform.armoriq.ai/dashboard/api-keys
+    Get API Key: https://platform.watchtower.io/dashboard/api-keys
     """
 
     def __init__(
@@ -489,16 +497,16 @@ class ArmorIQEnterprise:
         agent_id: str = None,
         iap_endpoint: str = None,
         proxy_endpoint: str = None,
-        project_id: str = "armoriq-enterprise",
+        project_id: str = "watchtower-enterprise",
         enable_tirs: bool = True,
         enable_llm: bool = True,
     ):
         self.project_id = project_id
-        self.api_key = api_key or ARMORIQ_API_KEY
-        self.user_id = user_id or ARMORIQ_USER_ID
-        self.agent_id = agent_id or ARMORIQ_AGENT_ID
-        self.iap_endpoint = iap_endpoint or ARMORIQ_IAP_ENDPOINT
-        self.proxy_endpoint = proxy_endpoint or ARMORIQ_PROXY_ENDPOINT
+        self.api_key = api_key or WATCHTOWER_API_KEY
+        self.user_id = user_id or WATCHTOWER_USER_ID
+        self.agent_id = agent_id or WATCHTOWER_AGENT_ID
+        self.iap_endpoint = iap_endpoint or WATCHTOWER_IAP_ENDPOINT
+        self.proxy_endpoint = proxy_endpoint or WATCHTOWER_PROXY_ENDPOINT
 
         self.enable_tirs = enable_tirs
         self.enable_llm = enable_llm
@@ -513,11 +521,11 @@ class ArmorIQEnterprise:
         self._llm = None
         self._reasoning = None
 
-        # Try to initialize real ArmorIQ SDK
-        if ARMORIQ_SDK_AVAILABLE and self.api_key:
+        # Try to initialize real Watchtower SDK
+        if WATCHTOWER_SDK_AVAILABLE and self.api_key:
             if self.api_key.startswith("ak_live_") or self.api_key.startswith("ak_test_"):
                 try:
-                    self.client = ArmorIQClient(
+                    self.client = WatchtowerClient(
                         api_key=self.api_key,
                         iap_endpoint=self.iap_endpoint,
                         proxy_endpoint=self.proxy_endpoint,
@@ -526,14 +534,14 @@ class ArmorIQEnterprise:
                     )
                     self.mode = "LIVE"
                     logger.info("=" * 60)
-                    logger.info("  ArmorIQ LIVE MODE - Intent Authentication Active")
+                    logger.info("  Watchtower LIVE MODE - Intent Authentication Active")
                     logger.info("=" * 60)
                 except Exception as e:
-                    logger.warning(f"ArmorIQ SDK init failed: {e}")
+                    logger.warning(f"Watchtower SDK init failed: {e}")
 
         if self.mode == "DEMO":
             logger.info("=" * 60)
-            logger.info("  ArmorIQ DEMO MODE - Local Policy Engine")
+            logger.info("  Watchtower DEMO MODE - Local Policy Engine")
             logger.info(f"  Project: {project_id}")
             logger.info("=" * 60)
 
@@ -572,7 +580,7 @@ class ArmorIQEnterprise:
                 self._reasoning = None
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # UNIFIED VERIFICATION API (ArmorIQ + TIRS + LLM)
+    # UNIFIED VERIFICATION API (Watchtower + TIRS + LLM)
     # ═══════════════════════════════════════════════════════════════════════════
 
     def verify_intent(
@@ -586,7 +594,7 @@ class ArmorIQEnterprise:
         Unified intent verification through all three layers.
 
         Flow:
-        1. ArmorIQ: Verify intent with IAP
+        1. Watchtower: Verify intent with IAP
         2. TIRS: Check for behavioral drift
         3. LLM: Assess risk and provide reasoning (for edge cases)
 
@@ -605,37 +613,42 @@ class ArmorIQEnterprise:
 
         logger.info(f"Verifying intent {intent_id}: {agent_id}.{action}")
 
-        # Initialize result
+        # Initialize result with layer status
         result = UnifiedVerificationResult(
             allowed=True,
             confidence=1.0,
             risk_level="low",
             intent_id=intent_id,
+            layers_active={
+                "watchtower": True,  # Always active (uses local engine as fallback)
+                "tirs": self._tirs is not None,
+                "llm": self._reasoning is not None,
+            },
         )
 
         # ─────────────────────────────────────────────────────────────────────
-        # Layer 1: ArmorIQ IAP
+        # Layer 1: Watchtower IAP
         # ─────────────────────────────────────────────────────────────────────
-        armoriq_result = self._verify_armoriq(agent_id, action, payload)
-        result.armoriq_result = armoriq_result
-        result.armoriq_passed = armoriq_result.allowed
+        watchtower_result = self._verify_watchtower(agent_id, action, payload)
+        result.watchtower_result = watchtower_result
+        result.watchtower_passed = watchtower_result.allowed
 
-        if not armoriq_result.allowed:
+        if not watchtower_result.allowed:
             result.allowed = False
-            result.blocking_layer = "ArmorIQ"
+            result.blocking_layer = "Watchtower"
             result.confidence = 1.0
             result.risk_level = "high"
 
-            if armoriq_result.verdict == PolicyVerdict.ESCALATE:
+            if watchtower_result.verdict == PolicyVerdict.ESCALATE:
                 result.escalation_required = True
                 result.risk_level = "critical"
 
             self._record_audit(result, agent_id, action, payload)
             return result
 
-        if armoriq_result.verdict == PolicyVerdict.MODIFY:
-            result.modified_payload = armoriq_result.modified_payload
-            payload = armoriq_result.modified_payload or payload
+        if watchtower_result.verdict == PolicyVerdict.MODIFY:
+            result.modified_payload = watchtower_result.modified_payload
+            payload = watchtower_result.modified_payload or payload
 
         # ─────────────────────────────────────────────────────────────────────
         # Layer 2: TIRS Drift Detection
@@ -683,29 +696,39 @@ class ArmorIQEnterprise:
                     result.allowed = True
                     result.escalation_required = False
 
+                    # Record LLM override in TIRS for learning
+                    if self._tirs and result.tirs_score >= 0.5:
+                        self._record_llm_override(
+                            agent_id=agent_id,
+                            action=action,
+                            tirs_score=result.tirs_score,
+                            llm_confidence=result.llm_confidence,
+                            llm_reasoning=result.llm_reasoning,
+                        )
+
         # ─────────────────────────────────────────────────────────────────────
         # Final Decision
         # ─────────────────────────────────────────────────────────────────────
         if result.allowed:
             # Calculate combined confidence
-            armoriq_conf = 1.0 if result.armoriq_passed else 0.0
+            watchtower_conf = 1.0 if result.watchtower_passed else 0.0
             tirs_conf = 1.0 - result.tirs_score
             llm_conf = result.llm_confidence
 
-            result.confidence = (armoriq_conf * 0.4 + tirs_conf * 0.4 + llm_conf * 0.2)
+            result.confidence = (watchtower_conf * 0.4 + tirs_conf * 0.4 + llm_conf * 0.2)
 
         self._record_audit(result, agent_id, action, payload)
         return result
 
-    def _verify_armoriq(self, agent_id: str, action: str, payload: Dict) -> IntentResult:
-        """Verify intent through ArmorIQ (or local engine in demo mode)."""
+    def _verify_watchtower(self, agent_id: str, action: str, payload: Dict) -> IntentResult:
+        """Verify intent through Watchtower (or local engine in demo mode)."""
         if self.mode == "LIVE" and self.client:
             return self._verify_with_sdk(agent_id, action, payload)
         else:
             return self._local_engine.evaluate(action, payload, agent_id)
 
     def _verify_with_sdk(self, agent_id: str, action: str, payload: Dict) -> IntentResult:
-        """Use real ArmorIQ SDK for verification."""
+        """Use real Watchtower SDK for verification."""
         intent_id = f"ARMOR-{datetime.now().strftime('%Y%m%d%H%M%S')}-{self._intent_counter:04d}"
 
         try:
@@ -728,7 +751,7 @@ class ArmorIQEnterprise:
             token_id = token.token_id if hasattr(token, 'token_id') else intent_id
             plan_hash = token.plan_hash if hasattr(token, 'plan_hash') else None
 
-            # Apply local policies on top of ArmorIQ verification
+            # Apply local policies on top of Watchtower verification
             local_result = self._local_engine.evaluate(action, payload, agent_id)
 
             if not local_result.allowed:
@@ -746,14 +769,14 @@ class ArmorIQEnterprise:
                 intent_id=token_id,
                 allowed=True,
                 verdict=local_result.verdict,
-                reason="ArmorIQ verified + policy passed",
+                reason="Watchtower verified + policy passed",
                 modified_payload=local_result.modified_payload or payload,
                 token=token,
                 plan_hash=plan_hash
             )
 
         except Exception as e:
-            logger.warning(f"ArmorIQ error: {e}, falling back to local")
+            logger.warning(f"Watchtower error: {e}, falling back to local")
             return self._local_engine.evaluate(action, payload, agent_id)
 
     def _check_tirs(
@@ -779,7 +802,7 @@ class ArmorIQEnterprise:
                 agent_id=agent_id,
                 intent_text=intent_text,
                 capabilities=capabilities,
-                was_allowed=True,  # ArmorIQ already checked policy
+                was_allowed=True,  # Watchtower already checked policy
             )
 
             # Return TIRS result data
@@ -829,7 +852,7 @@ class ArmorIQEnterprise:
             # Build context for reasoning
             reasoning_context = {
                 "agent_id": agent_id,
-                "armoriq_passed": current_result.armoriq_passed,
+                "watchtower_passed": current_result.watchtower_passed,
                 **context,
             }
 
@@ -864,6 +887,62 @@ class ArmorIQEnterprise:
             traceback.print_exc()
             return {"recommendation": "proceed", "confidence": 0.5, "reasoning": ""}
 
+    def _record_llm_override(
+        self,
+        agent_id: str,
+        action: str,
+        tirs_score: float,
+        llm_confidence: float,
+        llm_reasoning: str,
+    ):
+        """
+        Record when LLM overrides a TIRS warning.
+
+        This creates a feedback loop so TIRS can learn from LLM decisions
+        and potentially adjust its thresholds or behavioral profiles.
+        """
+        if not self._tirs:
+            return
+
+        try:
+            # Record in TIRS timeline for analysis
+            from ..tirs.forensics.timeline import EventCategory, EventSeverity
+            self._tirs.timeline.record_event(
+                EventCategory.SYSTEM,
+                EventSeverity.INFO,
+                agent_id=agent_id,
+                action="llm_override",
+                description=f"LLM approved action that TIRS flagged (score={tirs_score:.2f})",
+                details={
+                    "action": action,
+                    "tirs_score": tirs_score,
+                    "llm_confidence": llm_confidence,
+                    "llm_reasoning": llm_reasoning[:200] if llm_reasoning else "",
+                },
+            )
+
+            # Record in audit chain if available
+            if self._tirs.audit:
+                from ..tirs.forensics.audit import AuditEventType
+                self._tirs.audit.log(
+                    event_type=AuditEventType.THRESHOLD_ADJUSTED,
+                    agent_id=agent_id,
+                    data={
+                        "override_type": "llm_approved_tirs_warning",
+                        "tirs_score": tirs_score,
+                        "llm_confidence": llm_confidence,
+                        "action": action,
+                    },
+                )
+
+            logger.info(
+                f"LLM override recorded for {agent_id}: "
+                f"TIRS={tirs_score:.2f}, LLM_conf={llm_confidence:.2f}"
+            )
+
+        except Exception as e:
+            logger.warning(f"Failed to record LLM override: {e}")
+
     # ═══════════════════════════════════════════════════════════════════════════
     # SIMPLE CAPTURE API (Backward Compatible)
     # ═══════════════════════════════════════════════════════════════════════════
@@ -875,12 +954,12 @@ class ArmorIQEnterprise:
         agent_name: str = None,
     ) -> IntentResult:
         """
-        Simple intent verification (ArmorIQ only, for backward compatibility).
+        Simple intent verification (Watchtower only, for backward compatibility).
 
         For full verification including TIRS and LLM, use verify_intent().
         """
         agent_name = agent_name or self.agent_id
-        return self._verify_armoriq(agent_name, action_type, payload)
+        return self._verify_watchtower(agent_name, action_type, payload)
 
     def invoke(
         self,
@@ -890,9 +969,9 @@ class ArmorIQEnterprise:
         intent_token: Any = None,
     ) -> Dict:
         """
-        Execute an action through ArmorIQ proxy.
+        Execute an action through Watchtower proxy.
 
-        In LIVE mode: Routes through ArmorIQ's secure proxy.
+        In LIVE mode: Routes through Watchtower's secure proxy.
         In DEMO mode: Returns simulated success.
         """
         if self.mode == "LIVE" and self.client and intent_token:
@@ -940,7 +1019,7 @@ class ArmorIQEnterprise:
             "confidence": result.confidence,
             "risk_level": result.risk_level,
             "blocking_layer": result.blocking_layer,
-            "armoriq_passed": result.armoriq_passed,
+            "watchtower_passed": result.watchtower_passed,
             "tirs_score": result.tirs_score,
             "tirs_level": result.tirs_level,
             "llm_recommendation": result.llm_recommendation,
@@ -954,7 +1033,7 @@ class ArmorIQEnterprise:
         denied = sum(1 for e in self.audit_log if not e["allowed"])
         escalated = sum(1 for e in self.audit_log if e["escalation_required"])
 
-        by_layer = {"ArmorIQ": 0, "TIRS": 0, "LLM": 0}
+        by_layer = {"Watchtower": 0, "TIRS": 0, "LLM": 0}
         for e in self.audit_log:
             if e.get("blocking_layer"):
                 by_layer[e["blocking_layer"]] = by_layer.get(e["blocking_layer"], 0) + 1
@@ -968,7 +1047,7 @@ class ArmorIQEnterprise:
             "project": self.project_id,
             "mode": self.mode,
             "layers": {
-                "armoriq": True,
+                "watchtower": True,
                 "tirs": self._tirs is not None,
                 "llm": self._llm is not None,
             },
@@ -987,10 +1066,10 @@ class ArmorIQEnterprise:
             "mode": self.mode,
             "project": self.project_id,
             "layers": {
-                "armoriq": {
+                "watchtower": {
                     "enabled": True,
                     "mode": self.mode,
-                    "sdk_available": ARMORIQ_SDK_AVAILABLE,
+                    "sdk_available": WATCHTOWER_SDK_AVAILABLE,
                 },
                 "tirs": {
                     "enabled": self.enable_tirs,
@@ -1006,32 +1085,32 @@ class ArmorIQEnterprise:
         }
 
     def close(self):
-        """Close the ArmorIQ client connection."""
+        """Close the Watchtower client connection."""
         if self.client:
             try:
                 self.client.close()
-            except:
-                pass
+            except Exception as e:
+                logger.debug(f"Error closing Watchtower client: {e}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # SINGLETON & EXPORTS
 # ═══════════════════════════════════════════════════════════════════════════════
 
-_armoriq_enterprise: Optional[ArmorIQEnterprise] = None
+_watchtower: Optional[WatchtowerOne] = None
 
 
-def get_armoriq_enterprise() -> ArmorIQEnterprise:
-    """Get the global ArmorIQ Enterprise instance."""
-    global _armoriq_enterprise
-    if _armoriq_enterprise is None:
-        _armoriq_enterprise = ArmorIQEnterprise()
-    return _armoriq_enterprise
+def get_watchtower() -> WatchtowerOne:
+    """Get the global Watchtower Enterprise instance."""
+    global _watchtower
+    if _watchtower is None:
+        _watchtower = WatchtowerOne()
+    return _watchtower
 
 
-def reset_armoriq_enterprise():
+def reset_watchtower():
     """Reset the global instance (for testing)."""
-    global _armoriq_enterprise
-    if _armoriq_enterprise:
-        _armoriq_enterprise.close()
-    _armoriq_enterprise = None
+    global _watchtower
+    if _watchtower:
+        _watchtower.close()
+    _watchtower = None

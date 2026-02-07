@@ -1,4 +1,4 @@
-# ArmorIQ Enterprise Agentic System
+# Watchtower One Enterprise Agentic System
 
 A large-scale, production-grade enterprise agentic system with advanced drift detection, compliance enforcement, and multi-agent orchestration.
 
@@ -108,7 +108,7 @@ pip install sentence-transformers
 
 ```python
 import asyncio
-from armoriq_enterprise.orchestrator import initialize_gateway
+from watchtower.orchestrator import initialize_gateway
 
 async def main():
     # Initialize the gateway
@@ -141,23 +141,23 @@ asyncio.run(main())
 
 ```bash
 # Quick validation
-python -m armoriq_enterprise.demo.enterprise_demo --quick
+python -m watchtower.demo.enterprise_demo --quick
 
 # Full demonstration
-python -m armoriq_enterprise.demo.enterprise_demo
+python -m watchtower.demo.enterprise_demo
 
 # Specific section
-python -m armoriq_enterprise.demo.enterprise_demo --section agents
-python -m armoriq_enterprise.demo.enterprise_demo --section workflows
-python -m armoriq_enterprise.demo.enterprise_demo --section compliance
-python -m armoriq_enterprise.demo.enterprise_demo --section drift
-python -m armoriq_enterprise.demo.enterprise_demo --section forensics
+python -m watchtower.demo.enterprise_demo --section agents
+python -m watchtower.demo.enterprise_demo --section workflows
+python -m watchtower.demo.enterprise_demo --section compliance
+python -m watchtower.demo.enterprise_demo --section drift
+python -m watchtower.demo.enterprise_demo --section forensics
 ```
 
 ## Project Structure
 
 ```
-armoriq_enterprise/
+watchtower/
 ├── __init__.py                 # Main package exports
 ├── README.md                   # This file
 │
@@ -246,7 +246,7 @@ agents = gateway.list_agents()
 ### TIRS Engine
 
 ```python
-from armoriq_enterprise.tirs import get_advanced_tirs
+from watchtower.tirs import get_advanced_tirs
 
 tirs = get_advanced_tirs()
 
@@ -271,7 +271,7 @@ tirs.export_agent_forensics(agent_id, output_dir)
 ### Compliance Engine
 
 ```python
-from armoriq_enterprise.compliance import get_compliance_engine
+from watchtower.compliance import get_compliance_engine
 
 compliance = get_compliance_engine()
 

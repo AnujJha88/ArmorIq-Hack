@@ -92,7 +92,7 @@ export default function Dashboard() {
       {/* Header */}
       <header className="border-b px-6 py-4 flex items-center justify-between" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
         <div>
-          <h1 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>ArmorIQ</h1>
+          <h1 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>Watchtower One</h1>
           <p className="text-sm" style={{ color: 'var(--text-muted)' }}>AI Agent with Guardrails</p>
         </div>
         <div className="flex items-center gap-4">
@@ -120,7 +120,7 @@ export default function Dashboard() {
                 HR Agent Demo
               </h2>
               <p className="mb-6" style={{ color: 'var(--text-muted)' }}>
-                Try asking me to do HR tasks. ArmorIQ will check each action.
+                Try asking me to do HR tasks. Watchtower One will check each action.
               </p>
               <div className="flex flex-wrap justify-center gap-2">
                 {[

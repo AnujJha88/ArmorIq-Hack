@@ -2,17 +2,17 @@
 """
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                              ║
-║   ArmorIQ + TIRS: Secure HR Agent Swarm - Hackathon Demo                    ║
+║   Watchtower + TIRS: Secure HR Agent Swarm - Hackathon Demo                    ║
 ║                                                                              ║
 ║   This demo showcases:                                                       ║
-║   1. ArmorIQ Intent Verification - Real-time policy enforcement             ║
+║   1. Watchtower Intent Verification - Real-time policy enforcement             ║
 ║   2. TIRS Drift Detection - Temporal behavior monitoring                    ║
 ║   3. Plan Simulation - Dry-run before execution                             ║
 ║   4. Auto-Remediation - Suggestions for blocked actions                     ║
 ║   5. Signed Audit Trail - Cryptographic logging                             ║
 ║                                                                              ║
 ║   Run: python demo/hackathon_demo.py                                        ║
-║   With API key: ARMORIQ_API_KEY=ak_test_xxx python demo/hackathon_demo.py   ║
+║   With API key: WATCHTOWER_API_KEY=ak_test_xxx python demo/hackathon_demo.py   ║
 ║                                                                              ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 """
@@ -26,8 +26,8 @@ from datetime import datetime
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Import ArmorIQ
-from hr_delegate.policies.armoriq_sdk import ArmorIQWrapper, PolicyVerdict
+# Import Watchtower
+from hr_delegate.policies.watchtower_sdk import WatchtowerWrapper, PolicyVerdict
 
 # Import TIRS
 from tirs import TIRS
@@ -101,30 +101,30 @@ def demo_intro():
     """)
 
     print(f"  {Colors.BOLD}Demo Features:{Colors.END}")
-    print(f"  ├─ ArmorIQ SDK integration for intent verification")
+    print(f"  ├─ Watchtower SDK integration for intent verification")
     print(f"  ├─ TIRS temporal drift detection")
     print(f"  ├─ Policy enforcement (Work-Life, Salary Caps, PII, etc.)")
     print(f"  ├─ Auto-remediation suggestions")
     print(f"  └─ Cryptographically signed audit trail")
     print()
 
-    api_key = os.getenv("ARMORIQ_API_KEY")
+    api_key = os.getenv("WATCHTOWER_API_KEY")
     if api_key:
-        print(f"  {Colors.GREEN}🔐 ArmorIQ API Key detected - LIVE MODE{Colors.END}")
+        print(f"  {Colors.GREEN}🔐 Watchtower API Key detected - LIVE MODE{Colors.END}")
     else:
-        print(f"  {Colors.YELLOW}⚡ Running in DEMO MODE (set ARMORIQ_API_KEY for live){Colors.END}")
+        print(f"  {Colors.YELLOW}⚡ Running in DEMO MODE (set WATCHTOWER_API_KEY for live){Colors.END}")
 
     print()
     pause(2)
 
 
-def demo_armoriq_policy_enforcement(armoriq: ArmorIQWrapper):
-    """Demonstrate ArmorIQ policy enforcement."""
-    banner("DEMO 1: ArmorIQ Policy Enforcement", Colors.GREEN)
+def demo_watchtower_policy_enforcement(watchtower: WatchtowerWrapper):
+    """Demonstrate Watchtower policy enforcement."""
+    banner("DEMO 1: Watchtower Policy Enforcement", Colors.GREEN)
 
     # Test 1: Allowed action
     section("Test 1: Valid Interview Scheduling (Should ALLOW)")
-    result = armoriq.capture_intent(
+    result = watchtower.capture_intent(
         action_type="schedule_interview",
         payload={
             "candidate": "John Smith",
@@ -139,7 +139,7 @@ def demo_armoriq_policy_enforcement(armoriq: ArmorIQWrapper):
 
     # Test 2: Weekend block
     section("Test 2: Weekend Scheduling (Should DENY)")
-    result = armoriq.capture_intent(
+    result = watchtower.capture_intent(
         action_type="schedule_interview",
         payload={
             "candidate": "John Smith",
@@ -155,7 +155,7 @@ def demo_armoriq_policy_enforcement(armoriq: ArmorIQWrapper):
 
     # Test 3: Salary cap
     section("Test 3: Over-Budget Offer (Should DENY)")
-    result = armoriq.capture_intent(
+    result = watchtower.capture_intent(
         action_type="generate_offer",
         payload={
             "candidate": "Alice Johnson",
@@ -172,7 +172,7 @@ def demo_armoriq_policy_enforcement(armoriq: ArmorIQWrapper):
 
     # Test 4: Valid offer
     section("Test 4: Valid Offer Within Band (Should ALLOW)")
-    result = armoriq.capture_intent(
+    result = watchtower.capture_intent(
         action_type="generate_offer",
         payload={
             "candidate": "Bob Williams",
@@ -188,7 +188,7 @@ def demo_armoriq_policy_enforcement(armoriq: ArmorIQWrapper):
 
     # Test 5: PII redaction
     section("Test 5: External Email with PII (Should MODIFY)")
-    result = armoriq.capture_intent(
+    result = watchtower.capture_intent(
         action_type="send_email",
         payload={
             "recipient": "candidate@gmail.com",
@@ -204,7 +204,7 @@ def demo_armoriq_policy_enforcement(armoriq: ArmorIQWrapper):
 
     # Test 6: Inclusive language
     section("Test 6: Non-Inclusive Language (Should DENY)")
-    result = armoriq.capture_intent(
+    result = watchtower.capture_intent(
         action_type="send_email",
         payload={
             "recipient": "team@company.com",
@@ -306,12 +306,12 @@ def demo_tirs_drift_detection(tirs: TIRS):
     pause(2)
 
 
-def demo_audit_trail(tirs: TIRS, armoriq: ArmorIQWrapper):
+def demo_audit_trail(tirs: TIRS, watchtower: WatchtowerWrapper):
     """Demonstrate audit trail."""
     banner("DEMO 4: Signed Audit Trail", Colors.CYAN)
 
-    section("ArmorIQ Audit Report")
-    report = armoriq.get_audit_report()
+    section("Watchtower Audit Report")
+    report = watchtower.get_audit_report()
     print(f"  Mode: {report['mode']}")
     print(f"  Total Intents: {report['total_intents']}")
     print(f"  ├─ Allowed: {report['allowed']}")
@@ -340,39 +340,39 @@ def demo_interactive():
 
   {Colors.CYAN}# Test policy enforcement:{Colors.END}
   python -c "
-from hr_delegate.policies.armoriq_sdk import get_armoriq
-armoriq = get_armoriq()
+from hr_delegate.policies.watchtower_sdk import get_watchtower
+watchtower = get_watchtower()
 
 # Try scheduling on weekend (should fail)
-result = armoriq.capture_intent('schedule_interview', {{'time': '2026-02-14 10:00'}}, 'test')
+result = watchtower.capture_intent('schedule_interview', {{'time': '2026-02-14 10:00'}}, 'test')
 print(f'Weekend: {{result.verdict.value}} - {{result.reason}}')
 
 # Try over-budget offer (should fail)
-result = armoriq.capture_intent('generate_offer', {{'role': 'L4', 'salary': 200000}}, 'test')
+result = watchtower.capture_intent('generate_offer', {{'role': 'L4', 'salary': 200000}}, 'test')
 print(f'Salary: {{result.verdict.value}} - {{result.reason}}')
 "
 
   {Colors.CYAN}# Test with your own scenarios:{Colors.END}
   python -c "
-from hr_delegate.policies.armoriq_sdk import get_armoriq
-armoriq = get_armoriq()
+from hr_delegate.policies.watchtower_sdk import get_watchtower
+watchtower = get_watchtower()
 
 # Your test here
-result = armoriq.capture_intent('YOUR_ACTION', {{'your': 'params'}}, 'agent')
+result = watchtower.capture_intent('YOUR_ACTION', {{'your': 'params'}}, 'agent')
 print(result)
 "
     """)
 
 
-def demo_summary(armoriq: ArmorIQWrapper):
+def demo_summary(watchtower: WatchtowerWrapper):
     """Show demo summary."""
     banner("DEMO COMPLETE", Colors.GREEN)
 
-    report = armoriq.get_audit_report()
+    report = watchtower.get_audit_report()
 
     print(f"""
   {Colors.BOLD}Summary:{Colors.END}
-  ├─ ArmorIQ Mode: {report['mode']}
+  ├─ Watchtower Mode: {report['mode']}
   ├─ Intents Verified: {report['total_intents']}
   ├─ Policies Enforced: {len(report['by_policy'])}
   └─ Audit Trail: Cryptographically Signed
@@ -385,10 +385,10 @@ def demo_summary(armoriq: ArmorIQWrapper):
   ✅ Complete audit trail for compliance
 
   {Colors.BOLD}Architecture:{Colors.END}
-  Agent Request → ArmorIQ SDK → Policy Check → TIRS Monitoring → Audit Log
+  Agent Request → Watchtower SDK → Policy Check → TIRS Monitoring → Audit Log
 
-  {Colors.CYAN}For live mode, set: ARMORIQ_API_KEY=ak_test_xxx{Colors.END}
-  {Colors.CYAN}Get key: https://platform.armoriq.ai/dashboard/api-keys{Colors.END}
+  {Colors.CYAN}For live mode, set: WATCHTOWER_API_KEY=ak_test_xxx{Colors.END}
+  {Colors.CYAN}Get key: https://platform.watchtower.io/dashboard/api-keys{Colors.END}
     """)
 
 
@@ -401,7 +401,7 @@ def main():
     try:
         # Suppress verbose logging for cleaner demo output
         import logging
-        logging.getLogger("ArmorIQ").setLevel(logging.WARNING)
+        logging.getLogger("Watchtower").setLevel(logging.WARNING)
         logging.getLogger("TIRS").setLevel(logging.WARNING)
         logging.getLogger("TIRS.Drift").setLevel(logging.WARNING)
         logging.getLogger("TIRS.Simulator").setLevel(logging.WARNING)
@@ -410,18 +410,18 @@ def main():
         # Initialize
         demo_intro()
 
-        armoriq = ArmorIQWrapper(project_id="hr-swarm-demo")
+        watchtower = WatchtowerWrapper(project_id="hr-swarm-demo")
         tirs = TIRS()
 
         # Run demos
-        demo_armoriq_policy_enforcement(armoriq)
+        demo_watchtower_policy_enforcement(watchtower)
         demo_tirs_simulation(tirs)
         demo_tirs_drift_detection(tirs)
-        demo_audit_trail(tirs, armoriq)
-        demo_summary(armoriq)
+        demo_audit_trail(tirs, watchtower)
+        demo_summary(watchtower)
 
         # Cleanup
-        armoriq.close()
+        watchtower.close()
 
     except KeyboardInterrupt:
         print(f"\n\n{Colors.YELLOW}Demo interrupted.{Colors.END}")

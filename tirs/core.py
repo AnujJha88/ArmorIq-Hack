@@ -77,7 +77,7 @@ class TIRS:
         Initialize TIRS.
 
         Args:
-            policy_engine: Optional ArmorIQ policy engine for live verification
+            policy_engine: Optional Watchtower policy engine for live verification
         """
         self.drift_engine = get_drift_engine()
         self.simulator = get_simulator(policy_engine)

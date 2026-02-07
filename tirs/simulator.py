@@ -327,7 +327,7 @@ class PlanSimulator:
         Initialize simulator with optional policy engine.
 
         Args:
-            policy_engine: ArmorIQ policy engine instance (or uses local stub)
+            policy_engine: Watchtower policy engine instance (or uses local stub)
         """
         self.policy_engine = policy_engine
         self._plan_counter = 0

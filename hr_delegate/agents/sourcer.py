@@ -96,7 +96,7 @@ class SourcerAgent(HRAgent):
             self.logger.warning(f"🚫 {recipient_email} is on Do Not Contact list")
             return False, "Recipient has opted out of communications."
         
-        # Compliance check via ArmorIQ
+        # Compliance check via Watchtower
         payload = {
             "recipient": recipient_email,
             "subject": subject,

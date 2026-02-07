@@ -2,13 +2,13 @@
 Enterprise Base Agent
 =====================
 Base class for all domain agents with:
-- ArmorIQ SDK integration (Intent Authentication Protocol)
+- Watchtower SDK integration (Intent Authentication Protocol)
 - TIRS drift detection
 - Compliance engine
 - LLM-powered autonomous reasoning
 
 The Triple-Layer Security Stack:
-1. ArmorIQ IAP - Cryptographic intent verification
+1. Watchtower IAP - Cryptographic intent verification
 2. TIRS - Behavioral drift detection
 3. LLM Reasoning - Intelligent edge case handling
 """
@@ -34,8 +34,8 @@ from ..llm import get_enterprise_llm, get_reasoning_engine
 from ..llm.service import DecisionContext, DecisionType
 from ..llm.reasoning import ReasoningMode
 
-# Import ArmorIQ Integration
-from ..integrations import get_armoriq_enterprise, ArmorIQEnterprise
+# Import Watchtower Integration
+from ..integrations import get_watchtower, WatchtowerOne
 
 logger = logging.getLogger("Enterprise.Agent")
 
@@ -110,10 +110,10 @@ class ActionResult:
     agent_id: str
     result_data: Dict[str, Any]
 
-    # ArmorIQ layer
-    armoriq_passed: bool = True
-    armoriq_intent_id: Optional[str] = None
-    armoriq_verdict: Optional[str] = None
+    # Watchtower layer
+    watchtower_passed: bool = True
+    watchtower_intent_id: Optional[str] = None
+    watchtower_verdict: Optional[str] = None
 
     # Compliance layer
     compliance_passed: bool = True
@@ -145,9 +145,9 @@ class ActionResult:
             "action": self.action,
             "agent_id": self.agent_id,
             "result_data": self.result_data,
-            "armoriq_passed": self.armoriq_passed,
-            "armoriq_intent_id": self.armoriq_intent_id,
-            "armoriq_verdict": self.armoriq_verdict,
+            "watchtower_passed": self.watchtower_passed,
+            "watchtower_intent_id": self.watchtower_intent_id,
+            "watchtower_verdict": self.watchtower_verdict,
             "compliance_passed": self.compliance_passed,
             "policies_triggered": self.policies_triggered,
             "risk_score": self.risk_score,
@@ -169,7 +169,7 @@ class EnterpriseAgent(ABC):
     Base class for enterprise domain agents.
 
     All agents have:
-    - ArmorIQ SDK integration (Intent Authentication Protocol)
+    - Watchtower SDK integration (Intent Authentication Protocol)
     - TIRS drift detection integration
     - Compliance engine integration
     - Capability-based authorization
@@ -177,7 +177,7 @@ class EnterpriseAgent(ABC):
     - LLM-powered autonomous reasoning
 
     The Triple-Layer Security Stack ensures all actions go through:
-    1. ArmorIQ IAP - Cryptographic intent verification
+    1. Watchtower IAP - Cryptographic intent verification
     2. TIRS - Behavioral drift detection
     3. LLM - Intelligent reasoning for edge cases
     """
@@ -193,8 +193,8 @@ class EnterpriseAgent(ABC):
         self.capabilities = config.capabilities
         self.policy_categories = config.policy_categories
 
-        # ArmorIQ Integration (Layer 1)
-        self.armoriq = get_armoriq_enterprise()
+        # Watchtower Integration (Layer 1)
+        self.watchtower = get_watchtower()
 
         # TIRS Engine (Layer 2)
         self.tirs = get_advanced_tirs()
@@ -211,14 +211,14 @@ class EnterpriseAgent(ABC):
         self._blocked_count = 0
         self._autonomous_decisions = 0
         self._escalated_count = 0
-        self._armoriq_blocked = 0
+        self._watchtower_blocked = 0
         self._tirs_blocked = 0
         self._is_active = True
 
         self.logger = logging.getLogger(f"Agent.{config.name}")
         self.logger.info(
             f"Initialized {config.name} with {len(config.capabilities)} capabilities "
-            f"(ArmorIQ={self.armoriq.mode}, autonomous={self.AUTONOMOUS_MODE})"
+            f"(Watchtower={self.watchtower.mode}, autonomous={self.AUTONOMOUS_MODE})"
         )
 
     @property
@@ -580,7 +580,7 @@ class EnterpriseAgent(ABC):
         Execute an action through the UNIFIED Triple-Layer Security Stack.
 
         This is the recommended execution method that uses:
-        1. ArmorIQ IAP - Intent verification
+        1. Watchtower IAP - Intent verification
         2. TIRS - Drift detection
         3. LLM - Reasoning for edge cases
 
@@ -614,9 +614,9 @@ class EnterpriseAgent(ABC):
             )
 
         # ─────────────────────────────────────────────────────────────────────
-        # UNIFIED VERIFICATION: ArmorIQ + TIRS + LLM
+        # UNIFIED VERIFICATION: Watchtower + TIRS + LLM
         # ─────────────────────────────────────────────────────────────────────
-        verification = self.armoriq.verify_intent(
+        verification = self.watchtower.verify_intent(
             agent_id=self.agent_id,
             action=action,
             payload=payload,
@@ -633,8 +633,8 @@ class EnterpriseAgent(ABC):
         if not verification.allowed:
             self._blocked_count += 1
 
-            if verification.blocking_layer == "ArmorIQ":
-                self._armoriq_blocked += 1
+            if verification.blocking_layer == "Watchtower":
+                self._watchtower_blocked += 1
             elif verification.blocking_layer == "TIRS":
                 self._tirs_blocked += 1
 
@@ -644,11 +644,11 @@ class EnterpriseAgent(ABC):
                 agent_id=self.agent_id,
                 result_data={
                     "error": f"Blocked by {verification.blocking_layer}",
-                    "reason": verification.armoriq_result.reason if verification.armoriq_result else "Unknown",
+                    "reason": verification.watchtower_result.reason if verification.watchtower_result else "Unknown",
                 },
-                armoriq_passed=verification.armoriq_passed,
-                armoriq_intent_id=verification.intent_id,
-                armoriq_verdict=verification.armoriq_result.verdict.value if verification.armoriq_result else None,
+                watchtower_passed=verification.watchtower_passed,
+                watchtower_intent_id=verification.intent_id,
+                watchtower_verdict=verification.watchtower_result.verdict.value if verification.watchtower_result else None,
                 risk_score=verification.tirs_score,
                 risk_level=RiskLevel(verification.tirs_level) if verification.tirs_level != "nominal" else RiskLevel.NOMINAL,
                 tirs_passed=verification.tirs_passed,
@@ -669,8 +669,8 @@ class EnterpriseAgent(ABC):
                     "status": "escalated",
                     "reason": "Requires human approval",
                 },
-                armoriq_passed=verification.armoriq_passed,
-                armoriq_intent_id=verification.intent_id,
+                watchtower_passed=verification.watchtower_passed,
+                watchtower_intent_id=verification.intent_id,
                 risk_score=verification.tirs_score,
                 tirs_passed=verification.tirs_passed,
                 confidence=verification.confidence,
@@ -694,9 +694,9 @@ class EnterpriseAgent(ABC):
                 action=action,
                 agent_id=self.agent_id,
                 result_data=result_data,
-                armoriq_passed=True,
-                armoriq_intent_id=verification.intent_id,
-                armoriq_verdict="ALLOW",
+                watchtower_passed=True,
+                watchtower_intent_id=verification.intent_id,
+                watchtower_verdict="ALLOW",
                 risk_score=verification.tirs_score,
                 risk_level=RiskLevel(verification.tirs_level) if verification.tirs_level != "nominal" else RiskLevel.NOMINAL,
                 tirs_passed=True,
@@ -712,7 +712,7 @@ class EnterpriseAgent(ABC):
                 action=action,
                 agent_id=self.agent_id,
                 result_data={"error": str(e)},
-                armoriq_passed=True,
+                watchtower_passed=True,
                 risk_score=verification.tirs_score,
                 reasoning=f"Execution failed: {e}",
                 confidence=0.0,
@@ -771,7 +771,7 @@ class EnterpriseAgent(ABC):
     def get_status(self) -> Dict:
         """Get comprehensive agent status."""
         tirs_status = self.tirs.get_agent_status(self.agent_id)
-        armoriq_status = self.armoriq.get_status()
+        watchtower_status = self.watchtower.get_status()
 
         return {
             "agent_id": self.agent_id,
@@ -782,9 +782,9 @@ class EnterpriseAgent(ABC):
             "action_count": self._action_count,
             "blocked_count": self._blocked_count,
             "block_rate": self._blocked_count / max(self._action_count, 1),
-            # ArmorIQ layer
-            "armoriq_mode": armoriq_status.get("mode", "DEMO"),
-            "armoriq_blocked": self._armoriq_blocked,
+            # Watchtower layer
+            "watchtower_mode": watchtower_status.get("mode", "DEMO"),
+            "watchtower_blocked": self._watchtower_blocked,
             # TIRS layer
             "risk_score": tirs_status.get("risk_score", 0.0),
             "is_throttled": tirs_status.get("is_throttled", False),
@@ -797,7 +797,7 @@ class EnterpriseAgent(ABC):
             "llm_mode": self.llm.mode.value if self.llm else "unavailable",
             # Triple-layer summary
             "security_stack": {
-                "armoriq": armoriq_status.get("mode", "DEMO"),
+                "watchtower": watchtower_status.get("mode", "DEMO"),
                 "tirs": "active",
                 "llm": "active" if self.llm else "unavailable",
             },

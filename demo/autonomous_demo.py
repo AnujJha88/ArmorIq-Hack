@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ArmorIQ Enterprise Autonomous System Demo
+Watchtower Enterprise Autonomous System Demo
 ==========================================
 Demonstrates the fully autonomous agentic system with:
 - LLM-powered decision making
@@ -18,13 +18,13 @@ from pathlib import Path
 # Add project to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from armoriq_enterprise.orchestrator import (
+from watchtower.orchestrator import (
     get_gateway,
     initialize_gateway,
     get_workflow_generator,
     get_collaboration_hub,
 )
-from armoriq_enterprise.llm import get_enterprise_llm, get_reasoning_engine, get_planner
+from watchtower.llm import get_enterprise_llm, get_reasoning_engine, get_planner
 
 # Configure logging
 logging.basicConfig(
@@ -272,7 +272,7 @@ async def demo_system_status():
 async def main():
     """Run all demos."""
     print("\n" + "=" * 70)
-    print("     ArmorIQ Enterprise Autonomous System Demo")
+    print("     Watchtower Enterprise Autonomous System Demo")
     print("=" * 70)
     print("\nThis demo showcases the fully autonomous agentic system with:")
     print("  - LLM-powered decision making")

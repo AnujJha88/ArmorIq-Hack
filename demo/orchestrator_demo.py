@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-ArmorIQ Orchestrator Demo
+Watchtower Orchestrator Demo
 =========================
-Full multi-agent orchestration with ArmorIQ verification at every handoff.
+Full multi-agent orchestration with Watchtower verification at every handoff.
 
 This demo shows:
 1. Agent registry and capability routing
 2. Pipeline planning from high-level goals
-3. ArmorIQ verification at EVERY agent handoff
+3. Watchtower verification at EVERY agent handoff
 4. Shared context flowing through the pipeline
 5. Policy enforcement and drift detection
 """
@@ -92,8 +92,8 @@ class DemoCallbacks:
         print(f"{C.BOLD}│  HANDOFF {self.step_num}: {from_agent} → {to_agent:<30}│{C.END}")
         print(f"{C.BOLD}└{'─'*78}┘{C.END}")
 
-        # ArmorIQ verification
-        print(f"\n{C.BLUE}▶ ArmorIQ Verification:{C.END}")
+        # Watchtower verification
+        print(f"\n{C.BLUE}▶ Watchtower Verification:{C.END}")
         if verification.token_id:
             print(f"  Token: {verification.token_id[:24]}...")
             print(f"  Hash:  {verification.plan_hash}...")
@@ -156,7 +156,7 @@ class DemoCallbacks:
         print(f"  Tasks: {summary['completed']}/{summary['total_tasks']} completed")
         print(f"  Blocked: {summary['blocked']} | Failed: {summary['failed']}")
         print(f"  Max Risk: [{risk_bar(summary['max_risk'])}]")
-        print(f"  ArmorIQ Tokens: {summary['intent_tokens']}")
+        print(f"  Watchtower Tokens: {summary['intent_tokens']}")
 
     def get_callbacks(self):
         return {
@@ -204,15 +204,15 @@ def main():
 {C.BOLD}{C.CYAN}
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                              ║
-║   ArmorIQ Orchestrator Demo                                                  ║
+║   Watchtower Orchestrator Demo                                                  ║
 ║   ─────────────────────────                                                  ║
 ║                                                                              ║
-║   Multi-agent orchestration with ArmorIQ verification at every handoff      ║
+║   Multi-agent orchestration with Watchtower verification at every handoff      ║
 ║                                                                              ║
 ║   Features:                                                                  ║
 ║   • Agent Registry - Track capabilities and route tasks                     ║
 ║   • Pipeline Planning - Break goals into agent tasks                        ║
-║   • ArmorIQ Handoffs - Verify EVERY agent-to-agent transfer                 ║
+║   • Watchtower Handoffs - Verify EVERY agent-to-agent transfer                 ║
 ║   • Shared Context - Data flows between agents                              ║
 ║   • Drift Detection - Track cumulative risk                                 ║
 ║                                                                              ║
@@ -226,9 +226,9 @@ def main():
     print(f"{C.GRAY}Initializing orchestrator...{C.END}")
     orchestrator = Orchestrator()
 
-    api_key = os.getenv("ARMORIQ_API_KEY", "")
+    api_key = os.getenv("WATCHTOWER_API_KEY", "")
     if api_key.startswith("ak_"):
-        print(f"{C.GREEN}✓ ArmorIQ SDK connected (LIVE MODE){C.END}")
+        print(f"{C.GREEN}✓ Watchtower SDK connected (LIVE MODE){C.END}")
         print(f"{C.GRAY}  API Key: {api_key[:15]}...{api_key[-8:]}{C.END}")
     else:
         print(f"{C.YELLOW}⚠ Using local policies only{C.END}")
@@ -326,7 +326,7 @@ def main():
 ║     └─ High-level goal → Task breakdown                                      ║
 ║     └─ Dependency management between tasks                                   ║
 ║                                                                              ║
-║  3. ARMORIQ HANDOFF VERIFICATION                                             ║
+║  3. WATCHTOWER HANDOFF VERIFICATION                                             ║
 ║     └─ Every agent-to-agent transfer verified                                ║
 ║     └─ Intent tokens issued for each handoff                                 ║
 ║     └─ Policies enforced: Salary Caps, Work-Life, I-9, PII                   ║
@@ -349,7 +349,7 @@ def main():
 ║  │       │            │            │            │            │          │  ║
 ║  │       ▼            ▼            ▼            ▼            ▼          │  ║
 ║  │  ┌─────────────────────────────────────────────────────────────┐     │  ║
-║  │  │                    ArmorIQ Verification                      │     │  ║
+║  │  │                    Watchtower Verification                      │     │  ║
 ║  │  │  Token → Policy Check → Drift Detection → Allow/Block       │     │  ║
 ║  │  └─────────────────────────────────────────────────────────────┘     │  ║
 ║  └────────────────────────────────────────────────────────────────────────┘  ║

@@ -3,7 +3,7 @@ Advanced TIRS Engine
 ====================
 Main integration point for the Temporal Intent Risk & Simulation system.
 
-The "star" of the ArmorIQ Enterprise system.
+The "star" of the Watchtower Enterprise system.
 """
 
 import logging
@@ -275,12 +275,25 @@ class AdvancedTIRS:
         # Update behavioral profile
         self._update_profile(agent_id, capabilities, drift_result.risk_score, not was_allowed)
 
+        # Calculate confidence from signal variance
+        # High variance = low confidence (signals disagree)
+        # Low variance = high confidence (signals agree)
+        signal_contributions = [s.contribution for s in drift_result.signals] if drift_result.signals else []
+        if signal_contributions:
+            mean_contrib = sum(signal_contributions) / len(signal_contributions)
+            variance = sum((x - mean_contrib) ** 2 for x in signal_contributions) / len(signal_contributions)
+            std_dev = variance ** 0.5
+            # Map std_dev to confidence: 0 std_dev = 1.0 confidence, 0.5+ std_dev = 0.5 confidence
+            confidence = max(0.5, 1.0 - min(0.5, std_dev))
+        else:
+            confidence = 0.5  # No signals = low confidence
+
         return TIRSResult(
             agent_id=agent_id,
             timestamp=timestamp,
             risk_score=drift_result.risk_score,
             risk_level=drift_result.risk_level,
-            confidence=0.85,  # TODO: Calculate from signal variance
+            confidence=confidence,
             drift_result=drift_result,
             explanation=explanation,
             agent_status=profile.status,

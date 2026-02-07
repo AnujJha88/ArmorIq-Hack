@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Quick ArmorIQ API Test
+Quick Watchtower API Test
 ======================
-Tests connection to ArmorIQ before running full demo.
+Tests connection to Watchtower before running full demo.
 """
 
 import os
@@ -19,7 +19,7 @@ if env_path.exists():
             if line and not line.startswith('#') and '=' in line:
                 key, value = line.split('=', 1)
                 os.environ[key] = value
-                if key == "ARMORIQ_API_KEY":
+                if key == "WATCHTOWER_API_KEY":
                     print(f"  {key}: {value[:15]}...{value[-8:]}")
                 elif value:
                     print(f"  {key}: {value[:30]}...")
@@ -28,13 +28,13 @@ else:
     sys.exit(1)
 
 print("\n" + "="*60)
-print("Testing ArmorIQ SDK Connection")
+print("Testing Watchtower SDK Connection")
 print("="*60 + "\n")
 
 # Check API key
-api_key = os.getenv("ARMORIQ_API_KEY", "")
+api_key = os.getenv("WATCHTOWER_API_KEY", "")
 if not api_key:
-    print("ERROR: ARMORIQ_API_KEY not set")
+    print("ERROR: WATCHTOWER_API_KEY not set")
     sys.exit(1)
 
 if not api_key.startswith("ak_"):
@@ -46,22 +46,22 @@ print(f"API Key: {api_key[:15]}...{api_key[-8:]}")
 print(f"Format: {'LIVE' if 'live' in api_key else 'TEST'} mode")
 
 # Try to import SDK
-print("\nImporting armoriq-sdk...")
+print("\nImporting watchtower-sdk...")
 try:
-    from armoriq_sdk import ArmorIQClient
-    print("  armoriq-sdk imported successfully")
+    from watchtower_sdk import WatchtowerClient
+    print("  watchtower-sdk imported successfully")
 except ImportError as e:
     print(f"  ERROR: {e}")
-    print("  Run: pip install armoriq-sdk")
+    print("  Run: pip install watchtower-sdk")
     sys.exit(1)
 
 # Initialize client
-print("\nInitializing ArmorIQ client...")
+print("\nInitializing Watchtower client...")
 try:
-    client = ArmorIQClient(
+    client = WatchtowerClient(
         api_key=api_key,
-        user_id=os.getenv("ARMORIQ_USER_ID", "test-user"),
-        agent_id=os.getenv("ARMORIQ_AGENT_ID", "test-agent")
+        user_id=os.getenv("WATCHTOWER_USER_ID", "test-user"),
+        agent_id=os.getenv("WATCHTOWER_AGENT_ID", "test-agent")
     )
     print("  Client initialized")
 except Exception as e:
@@ -100,7 +100,7 @@ except Exception as e:
     sys.exit(1)
 
 print("\n" + "="*60)
-print("SUCCESS! ArmorIQ SDK is working correctly.")
+print("SUCCESS! Watchtower SDK is working correctly.")
 print("="*60)
 print("\nRun the full demo with:")
 print("  python3 demo/dev_demo.py")

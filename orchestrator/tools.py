@@ -2,7 +2,7 @@
 Agent Tools
 ============
 Tool integrations that agents can use.
-Each tool call goes through ArmorIQ verification.
+Each tool call goes through Watchtower verification.
 """
 
 from abc import ABC, abstractmethod

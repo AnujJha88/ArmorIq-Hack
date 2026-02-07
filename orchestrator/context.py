@@ -18,7 +18,7 @@ class TaskStatus(Enum):
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
     FAILED = "failed"
-    BLOCKED = "blocked"      # Blocked by ArmorIQ
+    BLOCKED = "blocked"      # Blocked by Watchtower
     SKIPPED = "skipped"      # Skipped due to dependency failure
 
 
@@ -36,7 +36,7 @@ class TaskResult:
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     risk_score: float = 0.0
-    armoriq_token: Optional[str] = None
+    watchtower_token: Optional[str] = None
 
     @property
     def success(self) -> bool:
@@ -59,7 +59,7 @@ class TaskResult:
             "policy_triggered": self.policy_triggered,
             "suggestion": self.suggestion,
             "risk_score": self.risk_score,
-            "armoriq_token": self.armoriq_token,
+            "watchtower_token": self.watchtower_token,
             "duration_ms": self.duration_ms
         }
 
@@ -130,7 +130,7 @@ class PipelineContext:
     # Audit trail
     audit_log: List[Dict] = field(default_factory=list)
 
-    # ArmorIQ tokens
+    # Watchtower tokens
     intent_tokens: List[str] = field(default_factory=list)
 
     def add_task(self, task: Task):
@@ -187,8 +187,8 @@ class PipelineContext:
         self.max_risk = max(self.max_risk, result.risk_score)
 
         # Store token
-        if result.armoriq_token:
-            self.intent_tokens.append(result.armoriq_token)
+        if result.watchtower_token:
+            self.intent_tokens.append(result.watchtower_token)
 
         # Log
         self._log("task_completed", {

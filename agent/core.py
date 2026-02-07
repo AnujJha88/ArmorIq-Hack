@@ -1,7 +1,7 @@
 """
-ArmorIQ Agentic Core
+Watchtower Agentic Core
 ====================
-Real LLM-powered agent with ArmorIQ guardrails.
+Real LLM-powered agent with Watchtower guardrails.
 """
 
 import os
@@ -14,7 +14,7 @@ from datetime import datetime
 from google import genai
 from google.genai import types
 
-# ArmorIQ imports
+# Watchtower imports
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -143,7 +143,7 @@ TOOLS = [
 
 
 class HRAgent:
-    """AI-powered HR Agent with ArmorIQ guardrails."""
+    """AI-powered HR Agent with Watchtower guardrails."""
 
     def __init__(self, agent_id: str = "hr-agent-001"):
         self.agent_id = agent_id
@@ -193,8 +193,8 @@ When you need to take an action, use the appropriate tool. Explain what you're d
             ))
         return gemini_tools
 
-    def _check_with_armoriq(self, tool_name: str, args: dict) -> tuple[bool, str, str]:
-        """Check if action is allowed by ArmorIQ policies."""
+    def _check_with_watchtower(self, tool_name: str, args: dict) -> tuple[bool, str, str]:
+        """Check if action is allowed by Watchtower policies."""
 
         # Policy checks
         if tool_name == "send_offer":
@@ -357,8 +357,8 @@ When you need to take an action, use the appropriate tool. Explain what you're d
                 risk_level="OK"
             )
 
-        # Check with ArmorIQ
-        allowed, block_reason, suggestion = self._check_with_armoriq(tool_name, args)
+        # Check with Watchtower
+        allowed, block_reason, suggestion = self._check_with_watchtower(tool_name, args)
 
         # Record to TIRS
         self._record_to_tirs(tool_name, allowed)
@@ -427,8 +427,8 @@ When you need to take an action, use the appropriate tool. Explain what you're d
                         tool_name = part.function_call.name
                         args = dict(part.function_call.args) if part.function_call.args else {}
 
-                        # Check with ArmorIQ
-                        allowed, block_reason, suggestion = self._check_with_armoriq(tool_name, args)
+                        # Check with Watchtower
+                        allowed, block_reason, suggestion = self._check_with_watchtower(tool_name, args)
 
                         # Record to TIRS
                         self._record_to_tirs(tool_name, allowed)

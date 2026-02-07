@@ -4,10 +4,13 @@ Procurement Compliance Policies
 Vendor approval, spending limits, bid requirements.
 """
 
+import logging
 from typing import Dict, Any, List, Set
 from .base import (
     Policy, PolicyCategory, PolicyAction, PolicySeverity, PolicyResult,
 )
+
+logger = logging.getLogger("Compliance.Procurement")
 
 
 class VendorApprovalPolicy(Policy):
@@ -80,8 +83,8 @@ class VendorApprovalPolicy(Policy):
                 return self._warn(
                     f"Consider using preferred vendor for purchases over $10,000",
                 )
-        except (TypeError, ValueError):
-            pass
+        except (TypeError, ValueError) as e:
+            logger.warning(f"Amount validation failed for vendor check: {e}, skipping preferred vendor check")
 
         return self._allow(f"Vendor {vendor_id} is approved")
 

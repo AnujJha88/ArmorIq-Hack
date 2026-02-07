@@ -119,7 +119,7 @@ class SnapshotManager:
     """
 
     def __init__(self, storage_dir: Optional[Path] = None):
-        self.storage_dir = storage_dir or Path("/tmp/armoriq_forensics")
+        self.storage_dir = storage_dir or Path("/tmp/watchtower_forensics")
         self.storage_dir.mkdir(parents=True, exist_ok=True)
 
         self._snapshots: Dict[str, ForensicSnapshot] = {}

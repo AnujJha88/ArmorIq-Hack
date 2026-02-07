@@ -319,8 +319,8 @@ class MetricsRegistry:
         """Initialize default HR agent metrics."""
         # Counters
         self.counter("agent_actions_total", "Total number of agent actions")
-        self.counter("armoriq_intents_total", "Total ArmorIQ intent verifications")
-        self.counter("armoriq_denials_total", "Total ArmorIQ denials")
+        self.counter("watchtower_intents_total", "Total Watchtower intent verifications")
+        self.counter("watchtower_denials_total", "Total Watchtower denials")
         self.counter("llm_requests_total", "Total LLM API requests")
         self.counter("tool_executions_total", "Total tool executions")
         self.counter("errors_total", "Total errors")

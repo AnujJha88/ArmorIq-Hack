@@ -57,7 +57,7 @@ class SchedulerAgent(HRAgent):
         except ValueError:
             return []
         
-        # Weekend check (will also be enforced by ArmorIQ)
+        # Weekend check (will also be enforced by Watchtower)
         if target_date.weekday() >= 5:
             self.logger.warning("⛔ Weekend date requested")
             return []

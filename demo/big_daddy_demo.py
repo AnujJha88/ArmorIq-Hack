@@ -14,7 +14,7 @@
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
 
-The ultimate showcase of ArmorIQ's multi-agent orchestration with:
+The ultimate showcase of Watchtower's multi-agent orchestration with:
 • Real-time cryptographic intent verification
 • Enterprise compliance (IRCA, FCRA, GDPR, EEOC, SOX)
 • TIRS drift detection with live risk monitoring
@@ -300,7 +300,7 @@ def splash_screen():
     # Loading bar
     print()
     for i in range(101):
-        progress_bar(i, 100, width=60, label="Loading ArmorIQ", color=Term.CYAN)
+        progress_bar(i, 100, width=60, label="Loading Watchtower", color=Term.CYAN)
         time.sleep(0.015)
     print()
 
@@ -335,14 +335,14 @@ def boot_sequence(orchestrator, compliance_engine):
 
     # API connections
     print()
-    armoriq_key = os.getenv("ARMORIQ_API_KEY", "")
+    watchtower_key = os.getenv("WATCHTOWER_API_KEY", "")
     gemini_key = os.getenv("GEMINI_API_KEY", "")
 
-    if armoriq_key.startswith("ak_"):
-        flash_text("  ⚡ ArmorIQ LIVE MODE ACTIVE ⚡", times=2, color=Term.BRIGHT_GREEN)
-        print(f"    {Term.GRAY}Key: {armoriq_key[:20]}...{armoriq_key[-8:]}{Term.END}")
+    if watchtower_key.startswith("ak_"):
+        flash_text("  ⚡ Watchtower LIVE MODE ACTIVE ⚡", times=2, color=Term.BRIGHT_GREEN)
+        print(f"    {Term.GRAY}Key: {watchtower_key[:20]}...{watchtower_key[-8:]}{Term.END}")
     else:
-        print(f"  {Term.YELLOW}⚠ ArmorIQ: Local policies only{Term.END}")
+        print(f"  {Term.YELLOW}⚠ Watchtower: Local policies only{Term.END}")
 
     if gemini_key:
         print(f"  {Term.GREEN}✓ Gemini AI: Connected{Term.END}")
@@ -483,8 +483,8 @@ class LivePipelineVisualizer:
 
         self.delay(0.2)
 
-        # ArmorIQ verification animation
-        print(f"\n    {Term.MAGENTA}◆ ArmorIQ Verification{Term.END}")
+        # Watchtower verification animation
+        print(f"\n    {Term.MAGENTA}◆ Watchtower Verification{Term.END}")
 
         if verification.token_id:
             self.tokens_issued += 1
@@ -604,7 +604,7 @@ class LivePipelineVisualizer:
         print(f"    Goal:        {summary['goal']}")
         print(f"    Tasks:       {Term.GREEN}{summary['completed']}{Term.END}/{summary['total_tasks']} completed")
         print(f"    Blocked:     {Term.RED if summary['blocked'] > 0 else Term.GRAY}{summary['blocked']}{Term.END}")
-        print(f"    Tokens:      {Term.CYAN}{self.tokens_issued}{Term.END} ArmorIQ tokens issued")
+        print(f"    Tokens:      {Term.CYAN}{self.tokens_issued}{Term.END} Watchtower tokens issued")
 
         risk_meter(summary['max_risk'], width=40, animated=False)
 
@@ -625,9 +625,9 @@ class LivePipelineVisualizer:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def run_ai_agent_demo(fast_mode=False):
-    """Interactive demo with REAL Gemini AI + ArmorIQ."""
+    """Interactive demo with REAL Gemini AI + Watchtower."""
     print(f"\n{Term.BOLD}{Term.BRIGHT_MAGENTA}{'═' * 78}{Term.END}")
-    print(f"{Term.BOLD}{Term.BRIGHT_MAGENTA}  LIVE AI AGENT DEMO (Gemini + ArmorIQ){Term.END}")
+    print(f"{Term.BOLD}{Term.BRIGHT_MAGENTA}  LIVE AI AGENT DEMO (Gemini + Watchtower){Term.END}")
     print(f"{Term.BOLD}{Term.BRIGHT_MAGENTA}{'═' * 78}{Term.END}\n")
 
     # Check for Gemini API key
@@ -673,7 +673,7 @@ def run_ai_agent_demo(fast_mode=False):
             },
         ]
 
-        print(f"  {Term.WHITE}Testing AI agent with real LLM + ArmorIQ guardrails:{Term.END}\n")
+        print(f"  {Term.WHITE}Testing AI agent with real LLM + Watchtower guardrails:{Term.END}\n")
 
         for i, test in enumerate(test_prompts, 1):
             print(f"  {Term.BOLD}Test {i}/{len(test_prompts)}: {test['description']}{Term.END}")
@@ -870,14 +870,14 @@ def epic_summary(orchestrator, compliance_engine):
 
     # Check AI integration status
     gemini_key = os.getenv("GEMINI_API_KEY", "")
-    armoriq_key = os.getenv("ARMORIQ_API_KEY", "")
+    watchtower_key = os.getenv("WATCHTOWER_API_KEY", "")
 
     stats_content.extend([
         f"",
         f"{Term.BOLD}API INTEGRATIONS{Term.END}",
         f"",
         f"  {Term.GREEN if gemini_key else Term.GRAY}{'✓' if gemini_key else '○'}{Term.END} Gemini AI    - {'LIVE' if gemini_key else 'Mock mode'}",
-        f"  {Term.GREEN if armoriq_key.startswith('ak_') else Term.GRAY}{'✓' if armoriq_key.startswith('ak_') else '○'}{Term.END} ArmorIQ API  - {'LIVE' if armoriq_key.startswith('ak_') else 'Local only'}",
+        f"  {Term.GREEN if watchtower_key.startswith('ak_') else Term.GRAY}{'✓' if watchtower_key.startswith('ak_') else '○'}{Term.END} Watchtower API  - {'LIVE' if watchtower_key.startswith('ak_') else 'Local only'}",
         f"  {Term.GREEN}✓{Term.END} TIRS Drift   - Active",
         f"",
         f"{Term.BOLD}KEY FEATURES{Term.END}",
@@ -892,13 +892,13 @@ def epic_summary(orchestrator, compliance_engine):
         f"",
     ])
 
-    big_box("ARMORIQ SUMMARY", stats_content, color=Term.CYAN)
+    big_box("WATCHTOWER SUMMARY", stats_content, color=Term.CYAN)
 
     print(f"""
 {Term.BOLD}{Term.WHITE}
     ┌───────────────────────────────────────────────────────────────────────┐
     │                                                                       │
-    │   "ArmorIQ doesn't just monitor agents - it cryptographically        │
+    │   "Watchtower doesn't just monitor agents - it cryptographically        │
     │    guarantees their intent at every step of the pipeline."           │
     │                                                                       │
     │                              - Enterprise Agentic Security           │
@@ -1035,7 +1035,7 @@ def main():
 
     wait("Press Enter to run LIVE AI AGENT demo...")
 
-    # Real AI agent demo with Gemini + ArmorIQ
+    # Real AI agent demo with Gemini + Watchtower
     run_ai_agent_demo(fast_mode=fast_mode)
 
     wait("Press Enter for final summary...")

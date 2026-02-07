@@ -1,15 +1,15 @@
 """
-ArmorIQ SDK Integration for HR Swarm
+Watchtower SDK Integration for HR Swarm
 ====================================
-Real ArmorIQ SDK integration with Intent Authentication Protocol (IAP).
+Real Watchtower SDK integration with Intent Authentication Protocol (IAP).
 
-ArmorIQ Flow:
+Watchtower Flow:
 1. capture_plan() - Define what the agent wants to do (CSRG format)
-2. get_intent_token() - Get cryptographically signed token from ArmorIQ IAP
-3. invoke() - Execute action through ArmorIQ proxy with verification
+2. get_intent_token() - Get cryptographically signed token from Watchtower IAP
+3. invoke() - Execute action through Watchtower proxy with verification
 
-Install: pip install armoriq-sdk
-Get API Key: https://platform.armoriq.ai/dashboard/api-keys
+Install: pip install watchtower-sdk
+Get API Key: https://platform.watchtower.io/dashboard/api-keys
 """
 
 import os
@@ -21,24 +21,24 @@ from datetime import datetime
 from dataclasses import dataclass, field
 from enum import Enum
 
-logging.basicConfig(level=logging.INFO, format='[ArmorIQ] %(levelname)s: %(message)s')
-armoriq_logger = logging.getLogger("ArmorIQ")
+logging.basicConfig(level=logging.INFO, format='[Watchtower] %(levelname)s: %(message)s')
+watchtower_logger = logging.getLogger("Watchtower")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # CONFIGURATION
 # ═══════════════════════════════════════════════════════════════════════════════
 
-ARMORIQ_API_KEY = os.getenv("ARMORIQ_API_KEY")
-ARMORIQ_IAP_ENDPOINT = os.getenv("ARMORIQ_IAP_ENDPOINT", "https://iap.armoriq.ai")
-ARMORIQ_PROXY_ENDPOINT = os.getenv("ARMORIQ_PROXY_ENDPOINT", "https://proxy.armoriq.ai")
-ARMORIQ_USER_ID = os.getenv("ARMORIQ_USER_ID", "hr-swarm-demo")
-ARMORIQ_AGENT_ID = os.getenv("ARMORIQ_AGENT_ID", "hr-agent")
+WATCHTOWER_API_KEY = os.getenv("WATCHTOWER_API_KEY")
+WATCHTOWER_IAP_ENDPOINT = os.getenv("WATCHTOWER_IAP_ENDPOINT", "https://iap.watchtower.io")
+WATCHTOWER_PROXY_ENDPOINT = os.getenv("WATCHTOWER_PROXY_ENDPOINT", "https://proxy.watchtower.io")
+WATCHTOWER_USER_ID = os.getenv("WATCHTOWER_USER_ID", "hr-swarm-demo")
+WATCHTOWER_AGENT_ID = os.getenv("WATCHTOWER_AGENT_ID", "hr-agent")
 
-# Try to import ArmorIQ SDK
+# Try to import Watchtower SDK
 try:
-    from armoriq_sdk import (
-        ArmorIQClient,
+    from watchtower_sdk import (
+        WatchtowerClient,
         IntentMismatchException,
         InvalidTokenException,
         TokenExpiredException,
@@ -46,11 +46,11 @@ try:
         PlanCapture,
         IntentToken
     )
-    ARMORIQ_SDK_AVAILABLE = True
-    armoriq_logger.info("✓ armoriq-sdk v0.2.6 loaded")
+    WATCHTOWER_SDK_AVAILABLE = True
+    watchtower_logger.info("✓ watchtower-sdk v0.2.6 loaded")
 except ImportError:
-    ARMORIQ_SDK_AVAILABLE = False
-    armoriq_logger.warning("⚠️  armoriq-sdk not installed. Run: pip install armoriq-sdk")
+    WATCHTOWER_SDK_AVAILABLE = False
+    watchtower_logger.warning("⚠️  watchtower-sdk not installed. Run: pip install watchtower-sdk")
 
 
 class PolicyVerdict(Enum):
@@ -61,7 +61,7 @@ class PolicyVerdict(Enum):
 
 @dataclass
 class IntentResult:
-    """Result from ArmorIQ intent verification."""
+    """Result from Watchtower intent verification."""
     intent_id: str
     allowed: bool
     verdict: PolicyVerdict
@@ -79,7 +79,7 @@ class IntentResult:
 class LocalPolicyEngine:
     """
     Local policy engine for demo mode.
-    Simulates ArmorIQ policy enforcement when SDK credentials unavailable.
+    Simulates Watchtower policy enforcement when SDK credentials unavailable.
     """
 
     POLICIES = {
@@ -249,30 +249,30 @@ class LocalPolicyEngine:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# ARMORIQ WRAPPER (Main Interface)
+# WATCHTOWER WRAPPER (Main Interface)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-class ArmorIQWrapper:
+class WatchtowerWrapper:
     """
-    ArmorIQ SDK Wrapper for HR Swarm
+    Watchtower SDK Wrapper for HR Swarm
     =================================
 
     LIVE MODE (with API key):
-        Uses real ArmorIQ SDK with cryptographic Intent Authentication Protocol.
-        All actions verified through ArmorIQ's IAP before execution.
+        Uses real Watchtower SDK with cryptographic Intent Authentication Protocol.
+        All actions verified through Watchtower's IAP before execution.
 
     DEMO MODE (no API key):
         Uses local policy engine for demonstrations.
-        Simulates ArmorIQ behavior with configurable policies.
+        Simulates Watchtower behavior with configurable policies.
 
     Environment Variables:
-        ARMORIQ_API_KEY - Your ArmorIQ API key (ak_live_* or ak_test_*)
-        ARMORIQ_IAP_ENDPOINT - IAP endpoint (default: https://iap.armoriq.ai)
-        ARMORIQ_PROXY_ENDPOINT - Proxy endpoint (default: https://proxy.armoriq.ai)
-        ARMORIQ_USER_ID - User identifier
-        ARMORIQ_AGENT_ID - Agent identifier
+        WATCHTOWER_API_KEY - Your Watchtower API key (ak_live_* or ak_test_*)
+        WATCHTOWER_IAP_ENDPOINT - IAP endpoint (default: https://iap.watchtower.io)
+        WATCHTOWER_PROXY_ENDPOINT - Proxy endpoint (default: https://proxy.watchtower.io)
+        WATCHTOWER_USER_ID - User identifier
+        WATCHTOWER_AGENT_ID - Agent identifier
 
-    Get API Key: https://platform.armoriq.ai/dashboard/api-keys
+    Get API Key: https://platform.watchtower.io/dashboard/api-keys
     """
 
     def __init__(self,
@@ -284,22 +284,22 @@ class ArmorIQWrapper:
                  project_id: str = "hr-swarm"):
 
         self.project_id = project_id
-        self.api_key = api_key or ARMORIQ_API_KEY
-        self.user_id = user_id or ARMORIQ_USER_ID
-        self.agent_id = agent_id or ARMORIQ_AGENT_ID
-        self.iap_endpoint = iap_endpoint or ARMORIQ_IAP_ENDPOINT
-        self.proxy_endpoint = proxy_endpoint or ARMORIQ_PROXY_ENDPOINT
+        self.api_key = api_key or WATCHTOWER_API_KEY
+        self.user_id = user_id or WATCHTOWER_USER_ID
+        self.agent_id = agent_id or WATCHTOWER_AGENT_ID
+        self.iap_endpoint = iap_endpoint or WATCHTOWER_IAP_ENDPOINT
+        self.proxy_endpoint = proxy_endpoint or WATCHTOWER_PROXY_ENDPOINT
 
         self.audit_log: List[Dict] = []
         self._intent_counter = 0
         self.client = None
         self.mode = "DEMO"
 
-        # Try to initialize real ArmorIQ SDK
-        if ARMORIQ_SDK_AVAILABLE and self.api_key:
+        # Try to initialize real Watchtower SDK
+        if WATCHTOWER_SDK_AVAILABLE and self.api_key:
             if self.api_key.startswith("ak_live_") or self.api_key.startswith("ak_test_"):
                 try:
-                    self.client = ArmorIQClient(
+                    self.client = WatchtowerClient(
                         api_key=self.api_key,
                         iap_endpoint=self.iap_endpoint,
                         proxy_endpoint=self.proxy_endpoint,
@@ -307,28 +307,28 @@ class ArmorIQWrapper:
                         agent_id=self.agent_id
                     )
                     self.mode = "LIVE"
-                    armoriq_logger.info("═" * 60)
-                    armoriq_logger.info("  🛡️  ArmorIQ LIVE MODE - Intent Authentication Active")
-                    armoriq_logger.info("═" * 60)
-                    armoriq_logger.info(f"  IAP Endpoint: {self.iap_endpoint}")
-                    armoriq_logger.info(f"  User: {self.user_id}")
-                    armoriq_logger.info(f"  Agent: {self.agent_id}")
-                    armoriq_logger.info("═" * 60)
+                    watchtower_logger.info("═" * 60)
+                    watchtower_logger.info("  🛡️  Watchtower LIVE MODE - Intent Authentication Active")
+                    watchtower_logger.info("═" * 60)
+                    watchtower_logger.info(f"  IAP Endpoint: {self.iap_endpoint}")
+                    watchtower_logger.info(f"  User: {self.user_id}")
+                    watchtower_logger.info(f"  Agent: {self.agent_id}")
+                    watchtower_logger.info("═" * 60)
                 except Exception as e:
-                    armoriq_logger.warning(f"⚠️  ArmorIQ SDK init failed: {e}")
-                    armoriq_logger.info("   Falling back to DEMO mode")
+                    watchtower_logger.warning(f"⚠️  Watchtower SDK init failed: {e}")
+                    watchtower_logger.info("   Falling back to DEMO mode")
             else:
-                armoriq_logger.warning(f"⚠️  Invalid API key format. Must start with 'ak_live_' or 'ak_test_'")
+                watchtower_logger.warning(f"⚠️  Invalid API key format. Must start with 'ak_live_' or 'ak_test_'")
 
         if self.mode == "DEMO":
-            armoriq_logger.info("═" * 60)
-            armoriq_logger.info("  🛡️  ArmorIQ DEMO MODE - Local Policy Engine")
-            armoriq_logger.info("═" * 60)
-            armoriq_logger.info(f"  Project: {project_id}")
+            watchtower_logger.info("═" * 60)
+            watchtower_logger.info("  🛡️  Watchtower DEMO MODE - Local Policy Engine")
+            watchtower_logger.info("═" * 60)
+            watchtower_logger.info(f"  Project: {project_id}")
             if not self.api_key:
-                armoriq_logger.info("  Set ARMORIQ_API_KEY for live mode")
-                armoriq_logger.info("  Get key: https://platform.armoriq.ai/dashboard/api-keys")
-            armoriq_logger.info("═" * 60)
+                watchtower_logger.info("  Set WATCHTOWER_API_KEY for live mode")
+                watchtower_logger.info("  Get key: https://platform.watchtower.io/dashboard/api-keys")
+            watchtower_logger.info("═" * 60)
 
         self._local_engine = LocalPolicyEngine()
 
@@ -338,7 +338,7 @@ class ArmorIQWrapper:
 
     def capture_intent(self, action_type: str, payload: Dict, agent_name: str = None) -> IntentResult:
         """
-        Verify an intent through ArmorIQ before execution.
+        Verify an intent through Watchtower before execution.
 
         Args:
             action_type: The action to perform (e.g., "send_email", "generate_offer")
@@ -356,7 +356,7 @@ class ArmorIQWrapper:
 
         # Use real SDK or local engine
         if self.mode == "LIVE" and self.client:
-            result = self._verify_with_armoriq(action_type, payload, agent_name)
+            result = self._verify_with_watchtower(action_type, payload, agent_name)
         else:
             result = self._local_engine.evaluate(action_type, payload)
 
@@ -366,12 +366,12 @@ class ArmorIQWrapper:
 
         return result
 
-    def _verify_with_armoriq(self, action: str, payload: Dict, agent_name: str) -> IntentResult:
-        """Use real ArmorIQ SDK for verification + local policy enforcement."""
+    def _verify_with_watchtower(self, action: str, payload: Dict, agent_name: str) -> IntentResult:
+        """Use real Watchtower SDK for verification + local policy enforcement."""
         intent_id = f"ARMOR-{datetime.now().strftime('%Y%m%d%H%M%S')}-{self._intent_counter:04d}"
 
         try:
-            # Build the plan structure for ArmorIQ
+            # Build the plan structure for Watchtower
             plan_structure = {
                 "goal": f"{agent_name} executing {action}",
                 "steps": [{
@@ -393,12 +393,12 @@ class ArmorIQWrapper:
             token_id = token.token_id if hasattr(token, 'token_id') else intent_id
             plan_hash = token.plan_hash if hasattr(token, 'plan_hash') else None
 
-            # ArmorIQ approved the intent structure - now apply local policy rules
+            # Watchtower approved the intent structure - now apply local policy rules
             # This combines cryptographic verification with business policy enforcement
             local_result = self._local_engine.evaluate(action, payload)
 
             if not local_result.allowed:
-                # Local policy denied - return with ArmorIQ token info
+                # Local policy denied - return with Watchtower token info
                 return IntentResult(
                     intent_id=token_id,
                     allowed=False,
@@ -422,12 +422,12 @@ class ArmorIQWrapper:
                     plan_hash=plan_hash
                 )
 
-            # Both ArmorIQ and local policies approved
+            # Both Watchtower and local policies approved
             return IntentResult(
                 intent_id=token_id,
                 allowed=True,
                 verdict=PolicyVerdict.ALLOW,
-                reason=f"ArmorIQ verified + policy passed",
+                reason=f"Watchtower verified + policy passed",
                 modified_payload=payload,
                 token=token,
                 plan_hash=plan_hash
@@ -439,7 +439,7 @@ class ArmorIQWrapper:
                 allowed=False,
                 verdict=PolicyVerdict.DENY,
                 reason=f"Intent mismatch: {str(e)}",
-                policy_triggered="ArmorIQ Intent Verification"
+                policy_triggered="Watchtower Intent Verification"
             )
         except InvalidTokenException as e:
             return IntentResult(
@@ -447,7 +447,7 @@ class ArmorIQWrapper:
                 allowed=False,
                 verdict=PolicyVerdict.DENY,
                 reason=f"Invalid token: {str(e)}",
-                policy_triggered="ArmorIQ Token Validation"
+                policy_triggered="Watchtower Token Validation"
             )
         except TokenExpiredException as e:
             return IntentResult(
@@ -455,17 +455,17 @@ class ArmorIQWrapper:
                 allowed=False,
                 verdict=PolicyVerdict.DENY,
                 reason=f"Token expired: {str(e)}",
-                policy_triggered="ArmorIQ Token Expiry"
+                policy_triggered="Watchtower Token Expiry"
             )
         except Exception as e:
-            armoriq_logger.warning(f"ArmorIQ error: {e}, falling back to local")
+            watchtower_logger.warning(f"Watchtower error: {e}, falling back to local")
             return self._local_engine.evaluate(action, payload)
 
     def invoke(self, mcp: str, action: str, params: Dict, intent_token: Any = None) -> Dict:
         """
-        Execute an action through ArmorIQ proxy.
+        Execute an action through Watchtower proxy.
 
-        In LIVE mode: Routes through ArmorIQ's secure proxy.
+        In LIVE mode: Routes through Watchtower's secure proxy.
         In DEMO mode: Executes via local MCP stubs.
         """
         if self.mode == "LIVE" and self.client and intent_token:
@@ -482,7 +482,7 @@ class ArmorIQWrapper:
                 return {"status": "error", "error": str(e)}
         else:
             # DEMO mode: Execute via MCP stubs
-            armoriq_logger.info(f"⚡ Executing {mcp}.{action} via MCP stub...")
+            watchtower_logger.info(f"⚡ Executing {mcp}.{action} via MCP stub...")
             
             try:
                 # Dynamically load the appropriate MCP stub
@@ -516,7 +516,7 @@ class ArmorIQWrapper:
                         "timestamp": datetime.now().isoformat()
                     }
             except Exception as e:
-                armoriq_logger.error(f"MCP execution error: {e}")
+                watchtower_logger.error(f"MCP execution error: {e}")
                 return {"status": "error", "error": str(e)}
     
     def _get_mcp_stub(self, mcp_name: str):
@@ -546,9 +546,9 @@ class ArmorIQWrapper:
             if stub_name:
                 return get_stub(stub_name)
         except ImportError:
-            armoriq_logger.debug("MCP stubs not available")
+            watchtower_logger.debug("MCP stubs not available")
         except ValueError:
-            armoriq_logger.debug(f"No stub for MCP: {mcp_name}")
+            watchtower_logger.debug(f"No stub for MCP: {mcp_name}")
         
         return None
 
@@ -557,26 +557,26 @@ class ArmorIQWrapper:
     # ═══════════════════════════════════════════════════════════════════════════
 
     def _log_verification_start(self, action: str, agent: str, payload: Dict):
-        armoriq_logger.info(f"╔{'═'*65}╗")
-        armoriq_logger.info(f"║  🛡️  ARMORIQ INTENT VERIFICATION                               ║")
-        armoriq_logger.info(f"╠{'═'*65}╣")
-        armoriq_logger.info(f"║  Agent:  {agent:<55}║")
-        armoriq_logger.info(f"║  Action: {action:<55}║")
-        armoriq_logger.info(f"║  Mode:   {self.mode:<55}║")
-        armoriq_logger.info(f"╠{'═'*65}╣")
+        watchtower_logger.info(f"╔{'═'*65}╗")
+        watchtower_logger.info(f"║  🛡️  WATCHTOWER INTENT VERIFICATION                               ║")
+        watchtower_logger.info(f"╠{'═'*65}╣")
+        watchtower_logger.info(f"║  Agent:  {agent:<55}║")
+        watchtower_logger.info(f"║  Action: {action:<55}║")
+        watchtower_logger.info(f"║  Mode:   {self.mode:<55}║")
+        watchtower_logger.info(f"╠{'═'*65}╣")
 
     def _log_verification_result(self, result: IntentResult):
         if result.verdict == PolicyVerdict.DENY:
-            armoriq_logger.warning(f"║  🛑 DENIED                                                      ║")
-            armoriq_logger.warning(f"║  Policy: {str(result.policy_triggered or 'N/A')[:54]:<54}║")
-            armoriq_logger.warning(f"║  Reason: {result.reason[:54]:<54}║")
+            watchtower_logger.warning(f"║  🛑 DENIED                                                      ║")
+            watchtower_logger.warning(f"║  Policy: {str(result.policy_triggered or 'N/A')[:54]:<54}║")
+            watchtower_logger.warning(f"║  Reason: {result.reason[:54]:<54}║")
         elif result.verdict == PolicyVerdict.MODIFY:
-            armoriq_logger.info(f"║  ⚠️  MODIFIED                                                    ║")
-            armoriq_logger.info(f"║  Policy: {str(result.policy_triggered or 'N/A')[:54]:<54}║")
-            armoriq_logger.info(f"║  Reason: {result.reason[:54]:<54}║")
+            watchtower_logger.info(f"║  ⚠️  MODIFIED                                                    ║")
+            watchtower_logger.info(f"║  Policy: {str(result.policy_triggered or 'N/A')[:54]:<54}║")
+            watchtower_logger.info(f"║  Reason: {result.reason[:54]:<54}║")
         else:
-            armoriq_logger.info(f"║  ✅ ALLOWED                                                      ║")
-        armoriq_logger.info(f"╚{'═'*65}╝")
+            watchtower_logger.info(f"║  ✅ ALLOWED                                                      ║")
+        watchtower_logger.info(f"╚{'═'*65}╝")
 
     def _record_audit(self, result: IntentResult, agent: str, action: str, payload: Dict):
         self.audit_log.append({
@@ -614,7 +614,7 @@ class ArmorIQWrapper:
         }
 
     def close(self):
-        """Close the ArmorIQ client connection."""
+        """Close the Watchtower client connection."""
         if self.client:
             try:
                 self.client.close()
@@ -626,21 +626,21 @@ class ArmorIQWrapper:
 # SINGLETON & EXPORTS
 # ═══════════════════════════════════════════════════════════════════════════════
 
-_armoriq: Optional[ArmorIQWrapper] = None
+_watchtower: Optional[WatchtowerWrapper] = None
 
-def get_armoriq() -> ArmorIQWrapper:
-    """Get the global ArmorIQ wrapper instance."""
-    global _armoriq
-    if _armoriq is None:
-        _armoriq = ArmorIQWrapper()
-    return _armoriq
+def get_watchtower() -> WatchtowerWrapper:
+    """Get the global Watchtower wrapper instance."""
+    global _watchtower
+    if _watchtower is None:
+        _watchtower = WatchtowerWrapper()
+    return _watchtower
 
-def reset_armoriq():
+def reset_watchtower():
     """Reset the global instance (for testing)."""
-    global _armoriq
-    if _armoriq:
-        _armoriq.close()
-    _armoriq = None
+    global _watchtower
+    if _watchtower:
+        _watchtower.close()
+    _watchtower = None
 
 # Backward compatibility
-ComplianceEngine = ArmorIQWrapper
+ComplianceEngine = WatchtowerWrapper

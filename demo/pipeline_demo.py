@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-ArmorIQ Pipeline Demo
+Watchtower Pipeline Demo
 =====================
-Full multi-step agentic pipelines with ArmorIQ verification and TIRS drift detection.
+Full multi-step agentic pipelines with Watchtower verification and TIRS drift detection.
 
 Shows:
 1. Complex hiring pipeline (5 steps)
-2. ArmorIQ verification at EACH step
+2. Watchtower verification at EACH step
 3. Drift detection across the entire pipeline
 4. Risk escalation visualization
 5. Pipeline blocking when risk too high
@@ -100,33 +100,33 @@ def show_drift_status(agent_id, risk_score, risk_level, intents):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# ARMORIQ CLIENT
+# WATCHTOWER CLIENT
 # ═══════════════════════════════════════════════════════════════════════════════
 
-class ArmorIQPipelineClient:
-    """ArmorIQ client for pipeline verification."""
+class WatchtowerPipelineClient:
+    """Watchtower client for pipeline verification."""
 
     def __init__(self):
-        self.api_key = os.getenv("ARMORIQ_API_KEY", "")
+        self.api_key = os.getenv("WATCHTOWER_API_KEY", "")
         self.real_client = None
         self.intent_count = 0
 
         try:
-            from armoriq_sdk import ArmorIQClient
+            from watchtower_sdk import WatchtowerClient
             if self.api_key.startswith("ak_"):
-                self.real_client = ArmorIQClient(
+                self.real_client = WatchtowerClient(
                     api_key=self.api_key,
-                    user_id=os.getenv("ARMORIQ_USER_ID", "pipeline-demo"),
-                    agent_id=os.getenv("ARMORIQ_AGENT_ID", "pipeline-agent")
+                    user_id=os.getenv("WATCHTOWER_USER_ID", "pipeline-demo"),
+                    agent_id=os.getenv("WATCHTOWER_AGENT_ID", "pipeline-agent")
                 )
-                print(f"{C.GREEN}✓ ArmorIQ SDK connected (LIVE MODE){C.END}")
+                print(f"{C.GREEN}✓ Watchtower SDK connected (LIVE MODE){C.END}")
             else:
                 print(f"{C.YELLOW}⚠ No valid API key - using mock mode{C.END}")
         except ImportError:
-            print(f"{C.YELLOW}⚠ armoriq-sdk not installed{C.END}")
+            print(f"{C.YELLOW}⚠ watchtower-sdk not installed{C.END}")
 
     def verify_step(self, action: str, payload: dict, agent: str) -> dict:
-        """Verify a pipeline step with ArmorIQ."""
+        """Verify a pipeline step with Watchtower."""
         self.intent_count += 1
 
         plan_structure = {
@@ -135,12 +135,12 @@ class ArmorIQPipelineClient:
         }
 
         # Show request
-        print(f"\n{C.BLUE}▶ ArmorIQ Request:{C.END}")
+        print(f"\n{C.BLUE}▶ Watchtower Request:{C.END}")
         print(f"  POST /iap/sdk/token")
         print(f"  Action: {action}")
         print(f"  Payload: {json.dumps(payload, indent=2)[:100]}...")
 
-        # Get token from ArmorIQ
+        # Get token from Watchtower
         token_id = None
         plan_hash = None
 
@@ -155,11 +155,11 @@ class ArmorIQPipelineClient:
                 token_id = token.token_id if hasattr(token, 'token_id') else None
                 plan_hash = token.plan_hash[:16] if hasattr(token, 'plan_hash') else None
 
-                print(f"\n{C.GREEN}◀ ArmorIQ Response: 200 OK{C.END}")
+                print(f"\n{C.GREEN}◀ Watchtower Response: 200 OK{C.END}")
                 print(f"  Token: {token_id[:20]}..." if token_id else "  Token: N/A")
                 print(f"  Hash: {plan_hash}..." if plan_hash else "  Hash: N/A")
             except Exception as e:
-                print(f"\n{C.RED}◀ ArmorIQ Error: {e}{C.END}")
+                print(f"\n{C.RED}◀ Watchtower Error: {e}{C.END}")
         else:
             token_id = f"mock_{self.intent_count:04d}"
             plan_hash = "mock_hash"
@@ -405,8 +405,8 @@ DRIFT_PIPELINE = [
 # PIPELINE EXECUTOR
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def run_pipeline(name: str, steps: List[Dict], armoriq: ArmorIQPipelineClient, drift: DriftEngine, pause_between=True):
-    """Execute a full pipeline with ArmorIQ verification and drift detection."""
+def run_pipeline(name: str, steps: List[Dict], watchtower: WatchtowerPipelineClient, drift: DriftEngine, pause_between=True):
+    """Execute a full pipeline with Watchtower verification and drift detection."""
 
     header(f"PIPELINE: {name}")
     print(f"  Steps: {len(steps)}")
@@ -422,8 +422,8 @@ def run_pipeline(name: str, steps: List[Dict], armoriq: ArmorIQPipelineClient, d
 
         step_header(i, len(steps), step["name"], step["agent"])
 
-        # Verify with ArmorIQ
-        result = armoriq.verify_step(step["action"], step["payload"], step["agent"])
+        # Verify with Watchtower
+        result = watchtower.verify_step(step["action"], step["payload"], step["agent"])
 
         # Show policy result
         if result["verdict"] == "ALLOW":
@@ -495,12 +495,12 @@ def main():
 {C.BOLD}{C.CYAN}
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                              ║
-║   ArmorIQ Pipeline Demo                                                      ║
+║   Watchtower Pipeline Demo                                                      ║
 ║   ─────────────────────                                                      ║
 ║                                                                              ║
 ║   This demo shows:                                                           ║
 ║   • Full multi-step agentic pipelines                                        ║
-║   • ArmorIQ verification at EACH step                                        ║
+║   • Watchtower verification at EACH step                                        ║
 ║   • TIRS drift detection across pipelines                                    ║
 ║   • Risk escalation and automatic blocking                                   ║
 ║                                                                              ║
@@ -508,7 +508,7 @@ def main():
 {C.END}
 """)
 
-    armoriq = ArmorIQPipelineClient()
+    watchtower = WatchtowerPipelineClient()
     drift = DriftEngine()
 
     no_pause = "--no-pause" in sys.argv
@@ -522,7 +522,7 @@ def main():
     wait("Press Enter to run Pipeline 1: Clean Hiring Flow...")
 
     # Pipeline 1: Clean hiring flow
-    run_pipeline("Clean Hiring Flow", HIRING_PIPELINE, armoriq, drift, not no_pause)
+    run_pipeline("Clean Hiring Flow", HIRING_PIPELINE, watchtower, drift, not no_pause)
 
     wait("\nPress Enter to run Pipeline 2: Hiring with Policy Violations...")
 
@@ -530,7 +530,7 @@ def main():
     drift = DriftEngine()
 
     # Pipeline 2: Bad hiring flow with violations
-    run_pipeline("Hiring with Policy Violations", BAD_HIRING_PIPELINE, armoriq, drift, not no_pause)
+    run_pipeline("Hiring with Policy Violations", BAD_HIRING_PIPELINE, watchtower, drift, not no_pause)
 
     wait("\nPress Enter to run Pipeline 3: Drift Detection Demo...")
 
@@ -538,7 +538,7 @@ def main():
     drift = DriftEngine()
 
     # Pipeline 3: Drift escalation
-    run_pipeline("Drift Escalation (Watch Risk Grow)", DRIFT_PIPELINE, armoriq, drift, not no_pause)
+    run_pipeline("Drift Escalation (Watch Risk Grow)", DRIFT_PIPELINE, watchtower, drift, not no_pause)
 
     # Final summary
     print(f"""
@@ -553,7 +553,7 @@ def main():
 ║     └─ All steps verified and allowed                                        ║
 ║                                                                              ║
 ║  2. POLICY VIOLATIONS                                                        ║
-║     └─ ArmorIQ blocked: weekend scheduling, over-budget offers,              ║
+║     └─ Watchtower blocked: weekend scheduling, over-budget offers,              ║
 ║        non-inclusive language, missing I-9                                   ║
 ║                                                                              ║
 ║  3. DRIFT DETECTION                                                          ║
@@ -562,7 +562,7 @@ def main():
 ║                                                                              ║
 ║  Architecture:                                                               ║
 ║  ┌─────────┐    ┌──────────┐    ┌────────────┐    ┌──────────────┐          ║
-║  │ Agent   │───▶│ ArmorIQ  │───▶│ Policy     │───▶│ TIRS Drift   │          ║
+║  │ Agent   │───▶│ Watchtower  │───▶│ Policy     │───▶│ TIRS Drift   │          ║
 ║  │ Action  │    │ Token    │    │ Engine     │    │ Detection    │          ║
 ║  └─────────┘    └──────────┘    └────────────┘    └──────────────┘          ║
 ║                                                                              ║

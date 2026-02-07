@@ -1,7 +1,7 @@
 """
 Advanced Policy Engine
 ======================
-Dynamic policy enforcement with ArmorIQ integration.
+Dynamic policy enforcement with Watchtower integration.
 """
 
 import re

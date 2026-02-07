@@ -1,5 +1,5 @@
 """
-ArmorIQ Orchestrator
+Watchtower Orchestrator
 ====================
 Multi-agent orchestration with cryptographic intent verification.
 

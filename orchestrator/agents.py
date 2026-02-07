@@ -1,7 +1,7 @@
 """
 Base Agent & Agent Implementations
 ===================================
-Agents that can be orchestrated with ArmorIQ verification.
+Agents that can be orchestrated with Watchtower verification.
 """
 
 import os
@@ -27,7 +27,7 @@ class BaseAgent(ABC):
 
     Every agent must:
     1. Declare its capabilities
-    2. Execute tasks with ArmorIQ verification
+    2. Execute tasks with Watchtower verification
     3. Report results back to the orchestrator
     """
 

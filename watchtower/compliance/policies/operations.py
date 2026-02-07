@@ -4,11 +4,14 @@ Operations Compliance Policies
 SLA compliance, ITIL processes, maintenance windows.
 """
 
+import logging
 from typing import Dict, Any, List
 from datetime import datetime, time
 from .base import (
     Policy, PolicyCategory, PolicyAction, PolicySeverity, PolicyResult,
 )
+
+logger = logging.getLogger("Compliance.Operations")
 
 
 class SLACompliancePolicy(Policy):
@@ -60,8 +63,8 @@ class SLACompliancePolicy(Policy):
                     return self._warn(
                         f"Resolution time ({resolution_time}h) exceeds SLA ({sla['resolution_hours']}h)",
                     )
-            except (TypeError, ValueError):
-                pass
+            except (TypeError, ValueError) as e:
+                logger.warning(f"Resolution time validation failed: {e}, skipping SLA resolution check")
 
         return self._allow(f"SLA compliance met for {priority} priority")
 

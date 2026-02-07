@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-ArmorIQ Full System Demo
+Watchtower Full System Demo
 ========================
-Comprehensive demonstration of the ArmorIQ orchestration system.
+Comprehensive demonstration of the Watchtower orchestration system.
 
 Features demonstrated:
 1. Multi-agent pipeline orchestration
-2. ArmorIQ cryptographic intent verification
+2. Watchtower cryptographic intent verification
 3. Advanced policy engine (8+ policies)
 4. TIRS drift detection with alerts
 5. Human-in-the-loop approval workflows
@@ -130,8 +130,8 @@ class DemoCallbacks:
         print(f"{C.BOLD}  STEP {self.step}: {from_agent} → {to_agent}{C.END}")
         print(f"{'─' * 76}")
 
-        # ArmorIQ verification
-        print(f"\n  {C.MAGENTA}ArmorIQ Verification:{C.END}")
+        # Watchtower verification
+        print(f"\n  {C.MAGENTA}Watchtower Verification:{C.END}")
         if verification.token_id:
             print(f"    Token:     {C.CYAN}{verification.token_id[:32]}...{C.END}")
             print(f"    Plan Hash: {C.CYAN}{verification.plan_hash}{C.END}")
@@ -220,7 +220,7 @@ class DemoCallbacks:
         print(f"  Tasks:    {summary['completed']}/{summary['total_tasks']} completed")
         print(f"  Blocked:  {summary['blocked']} | Failed: {summary['failed']}")
         print(f"  Max Risk: {risk_bar(summary['max_risk'], 25)}")
-        print(f"  Tokens:   {summary['intent_tokens']} ArmorIQ tokens issued")
+        print(f"  Tokens:   {summary['intent_tokens']} Watchtower tokens issued")
 
     def get_callbacks(self):
         return {
@@ -279,7 +279,7 @@ def run_clean_pipeline(orchestrator, pause):
     print(f"""
   This pipeline demonstrates a successful hiring flow:
   • All policy checks pass
-  • ArmorIQ tokens issued at each step
+  • Watchtower tokens issued at each step
   • Drift remains low throughout
   • No human approvals needed
 """)
@@ -514,7 +514,7 @@ def main():
 ║                                                                              ║
 ║   Features:                                                                  ║
 ║   • Multi-agent pipeline orchestration                                       ║
-║   • ArmorIQ cryptographic intent tokens                                      ║
+║   • Watchtower cryptographic intent tokens                                      ║
 ║   • 8+ policy types (Work-Life, Salary, PII, etc.)                          ║
 ║   • TIRS drift detection with alerts                                         ║
 ║   • Human-in-the-loop approval workflows                                     ║
@@ -541,10 +541,10 @@ def main():
 
     orchestrator = Orchestrator(config)
 
-    # Check ArmorIQ
-    api_key = os.getenv("ARMORIQ_API_KEY", "")
+    # Check Watchtower
+    api_key = os.getenv("WATCHTOWER_API_KEY", "")
     if api_key.startswith("ak_"):
-        print(f"{C.GREEN}✓ ArmorIQ SDK connected (LIVE MODE){C.END}")
+        print(f"{C.GREEN}✓ Watchtower SDK connected (LIVE MODE){C.END}")
         print(f"{C.GRAY}  Key: {api_key[:20]}...{api_key[-8:]}{C.END}")
     else:
         print(f"{C.YELLOW}⚠ Using local policies only{C.END}")
@@ -604,7 +604,7 @@ def main():
 ║     └─ Pipeline planning from high-level goals                               ║
 ║     └─ Task dependencies and execution ordering                              ║
 ║                                                                              ║
-║  2. ARMORIQ INTENT VERIFICATION                                              ║
+║  2. WATCHTOWER INTENT VERIFICATION                                              ║
 ║     └─ Cryptographic tokens at every agent handoff                           ║
 ║     └─ Plan hashing for tamper detection                                     ║
 ║     └─ Integration with local policy engine                                  ║
@@ -634,7 +634,7 @@ def main():
 ║  6. STATE PERSISTENCE & AUDIT                                                ║
 ║     └─ SQLite storage for pipelines, tasks, and metrics                      ║
 ║     └─ Complete audit trail of all actions                                   ║
-║     └─ ArmorIQ token tracking                                                ║
+║     └─ Watchtower token tracking                                                ║
 ║     └─ Drift metrics history                                                 ║
 ║                                                                              ║
 ║  7. TOOL INTEGRATIONS                                                        ║

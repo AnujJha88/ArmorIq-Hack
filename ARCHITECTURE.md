@@ -1,4 +1,4 @@
-# ArmorIQ + TIRS System Architecture
+# Watchtower One + TIRS System Architecture
 
 ## High-Level Flow
 
@@ -51,7 +51,7 @@
                        └───────────────┬───────────────┘
                                        ▼
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│                         ARMORIQ POLICY ENGINE                                    │
+│                         WATCHTOWER POLICY ENGINE                                    │
 │                                                                                  │
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐                  │
 │  │  Work-Life      │  │  Salary Caps    │  │ PII Protection  │                  │
@@ -137,7 +137,7 @@
 │           ▼                       ▼                       ▼                      │
 │  ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐            │
 │  │   Embeddings    │     │  Remediation    │     │  Policy Engine  │            │
-│  │  (embeddings)   │     │ (remediation)   │     │  (armoriq_sdk)  │            │
+│  │  (embeddings)   │     │ (remediation)   │     │  (watchtower_sdk)  │            │
 │  │                 │     │                 │     │                 │            │
 │  │ • Transformer   │     │ • Suggestions   │     │ • Intent verify │            │
 │  │ • Hash fallback │     │ • Auto-fix      │     │ • Compliance    │            │
@@ -207,7 +207,7 @@
 │   ┌─────────────────────────────────────────────────────────────────────────┐   │
 │   │                        FOR EACH STEP                                    │   │
 │   │                                                                         │   │
-│   │    Step ────▶ MCP Stub ────▶ ArmorIQ Policy ────▶ Verdict              │   │
+│   │    Step ────▶ MCP Stub ────▶ Watchtower One Policy ────▶ Verdict              │   │
 │   │                (dry-run)        (evaluate)                              │   │
 │   │                                                                         │   │
 │   └─────────────────────────────────────────────────────────────────────────┘   │
@@ -265,7 +265,7 @@
 │                         │    └────┬─────┘    │                                   │
 │                         │         │          │                                   │
 │                         │    execute_with_   │                                   │
-│                         │    armoriq()       │ resume()                          │
+│                         │    watchtower()       │ resume()                          │
 │                         │         │          │                                   │
 │                         │         ▼          │                                   │
 │                         │    ┌──────────┐    │                                   │
@@ -481,7 +481,7 @@
 ## File Structure
 
 ```
-ArmorIq-Hack/
+Watchtower-Hack/
 ├── tirs/                           # TIRS Core System
 │   ├── __init__.py                 # Lazy imports
 │   ├── core.py                     # Main TIRS interface
@@ -508,7 +508,7 @@ ArmorIq-Hack/
 │   │   └── culture_agent.py        # Culture & engagement
 │   │
 │   ├── policies/                   # Policy Engines
-│   │   ├── armoriq_sdk.py          # ArmorIQ integration
+│   │   ├── watchtower_sdk.py          # Watchtower One integration
 │   │   ├── compliance_engine.py    # Local policy rules
 │   │   ├── hot_reload.py           # Policy file watcher
 │   │   ├── policy_registry.py      # Centralized policy store

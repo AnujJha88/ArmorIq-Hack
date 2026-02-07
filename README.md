@@ -1,4 +1,4 @@
-# ArmorIQ Enterprise: Autonomous Agentic System
+# Watchtower One Enterprise: Autonomous Agentic System
 
 A production-grade **autonomous enterprise platform** with LLM-powered decision making, multi-agent collaboration, and advanced drift detection.
 
@@ -13,7 +13,7 @@ The system now features **true autonomous operation** where agents can:
 
 ## Innovation: TIRS
 
-**TIRS** adds a temporal, simulation-backed intent risk layer on top of ArmorIQ:
+**TIRS** adds a temporal, simulation-backed intent risk layer on top of Watchtower One:
 
 | Feature | Description |
 |---------|-------------|
@@ -69,7 +69,7 @@ The system now features **true autonomous operation** where agents can:
 ### Autonomous Capabilities
 
 ```python
-from armoriq_enterprise.orchestrator import initialize_gateway
+from watchtower.orchestrator import initialize_gateway
 
 # Initialize the autonomous gateway
 gateway = await initialize_gateway()
@@ -95,7 +95,7 @@ workflow = await gateway.generate_workflow(
 ### Agent Collaboration
 
 ```python
-from armoriq_enterprise.orchestrator import get_collaboration_hub
+from watchtower.orchestrator import get_collaboration_hub
 
 hub = get_collaboration_hub()
 
@@ -155,7 +155,7 @@ python demo/run_demo.py
               │                               │
               ▼                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                 ARMORIQ POLICY ENGINE                        │
+│                 WATCHTOWER POLICY ENGINE                        │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -166,7 +166,7 @@ python demo/run_demo.py
 
 ## Components
 
-### LLM & Autonomous (`armoriq_enterprise/llm/`)
+### LLM & Autonomous (`watchtower/llm/`)
 
 | Module | Description |
 |--------|-------------|
@@ -174,7 +174,7 @@ python demo/run_demo.py
 | `reasoning.py` | Multi-step reasoning engine for autonomous decisions |
 | `planner.py` | Goal decomposition and action planning |
 
-### Orchestrator (`armoriq_enterprise/orchestrator/`)
+### Orchestrator (`watchtower/orchestrator/`)
 
 | Module | Description |
 |--------|-------------|
@@ -184,7 +184,7 @@ python demo/run_demo.py
 | `router.py` | Capability-based request routing |
 | `handoff.py` | Verified agent-to-agent task handoffs |
 
-### Domain Agents (`armoriq_enterprise/agents/`)
+### Domain Agents (`watchtower/agents/`)
 
 6 specialized autonomous agents:
 - **Finance** - Expenses, budgets, invoices, audits
@@ -218,7 +218,7 @@ python demo/run_demo.py
 
 ### Policies (`hr_delegate/policies/`)
 
-- **ArmorIQ SDK** - Intent verification (LIVE + DEMO modes)
+- **Watchtower One SDK** - Intent verification (LIVE + DEMO modes)
 - **Compliance Engine** - Local policy evaluation
 
 ## Key Features
@@ -298,7 +298,7 @@ Run `python demo/run_demo.py` to see:
 
 ## Why TIRS?
 
-ArmorIQ provides real-time intent verification. TIRS adds:
+Watchtower One provides real-time intent verification. TIRS adds:
 
 - **Predictive**: Catch problems before execution
 - **Temporal**: Detect slow drift over multiple actions

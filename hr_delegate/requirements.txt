@@ -1,8 +1,8 @@
 # HR Swarm Dependencies
 # Install with: pip install -r requirements.txt
 
-# Core ArmorIQ SDK - THE KEY INTEGRATION
-armoriq-sdk>=0.1.0
+# Core Watchtower SDK - THE KEY INTEGRATION
+watchtower-sdk>=0.1.0
 
 # Optional: For async operations
 httpx>=0.24.0

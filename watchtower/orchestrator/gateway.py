@@ -109,7 +109,7 @@ class RequestResult:
 
 class EnterpriseGateway:
     """
-    Root orchestrator for the ArmorIQ Enterprise Agentic System.
+    Root orchestrator for the Watchtower Enterprise Agentic System.
 
     This is the main entry point that:
     1. Receives user/system requests (or natural language goals)
@@ -150,7 +150,7 @@ class EnterpriseGateway:
         self._initialized = False
 
         logger.info("=" * 70)
-        logger.info("  ARMORIQ ENTERPRISE GATEWAY")
+        logger.info("  WATCHTOWER ENTERPRISE GATEWAY")
         logger.info(f"  Autonomous Mode: {self.config.autonomous_mode}")
         logger.info(f"  LLM Mode: {self.llm.mode.value}")
         logger.info("=" * 70)

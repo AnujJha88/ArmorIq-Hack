@@ -131,7 +131,7 @@ class AuditChain:
     GENESIS_HASH = "0" * 64  # Genesis block hash
 
     def __init__(self, storage_path: Optional[Path] = None):
-        self.storage_path = storage_path or Path("/tmp/armoriq_audit.jsonl")
+        self.storage_path = storage_path or Path("/tmp/watchtower_audit.jsonl")
         self._entries: List[AuditEntry] = []
         self._lock = threading.Lock()
         self._sequence = 0

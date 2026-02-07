@@ -18,7 +18,7 @@ class ScreenerAgent(HRAgent):
     - Score candidates against job requirements
     - Generate interview recommendations
     - Detect skill gaps and suggest training
-    - Blind screening mode (ArmorIQ enforced)
+    - Blind screening mode (Watchtower enforced)
     
     Compliance:
     - Blind Screening: Name, Gender, University, Address REDACTED

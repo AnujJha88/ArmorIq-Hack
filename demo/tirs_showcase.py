@@ -142,8 +142,8 @@ async def demo_drift_detection():
 """)
 
     # Import TIRS
-    from armoriq_enterprise.tirs import get_advanced_tirs
-    from armoriq_enterprise.tirs.drift.detector import RiskLevel
+    from watchtower.tirs import get_advanced_tirs
+    from watchtower.tirs.drift.detector import RiskLevel
 
     tirs = get_advanced_tirs()
     agent_id = "finance_Demo"
@@ -404,8 +404,8 @@ async def demo_forensics():
     """Show forensic snapshot capture - REAL DATA."""
     print_section("INNOVATION: Forensic Snapshots (LIVE DATA)")
 
-    from armoriq_enterprise.tirs import get_advanced_tirs
-    from armoriq_enterprise.tirs.forensics.snapshot import get_snapshot_manager
+    from watchtower.tirs import get_advanced_tirs
+    from watchtower.tirs.forensics.snapshot import get_snapshot_manager
 
     tirs = get_advanced_tirs()
     snapshot_manager = get_snapshot_manager()

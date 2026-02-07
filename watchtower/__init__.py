@@ -1,5 +1,5 @@
 """
-ArmorIQ Enterprise Agentic System
+Watchtower Enterprise Agentic System
 =================================
 A large-scale, production-grade agentic system with:
 - Advanced TIRS Drift Detection
@@ -9,11 +9,12 @@ A large-scale, production-grade agentic system with:
 """
 
 __version__ = "1.0.0"
-__author__ = "ArmorIQ"
+__author__ = "Watchtower"
 
 from .tirs import AdvancedTIRS, get_advanced_tirs
 from .compliance import ComplianceEngine, get_compliance_engine
 from .orchestrator import EnterpriseGateway, get_gateway
+from .integrations import WatchtowerOne, get_watchtower
 
 __all__ = [
     "AdvancedTIRS",
@@ -22,4 +23,6 @@ __all__ = [
     "get_compliance_engine",
     "EnterpriseGateway",
     "get_gateway",
+    "WatchtowerOne",
+    "get_watchtower",
 ]

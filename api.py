@@ -1,7 +1,7 @@
 """
-ArmorIQ API Server
+Watchtower API Server
 ==================
-FastAPI backend for the ArmorIQ demo.
+FastAPI backend for the Watchtower demo.
 """
 
 import os
@@ -21,7 +21,7 @@ from agent.core import get_agent, HRAgent
 from tirs.core import get_tirs
 
 app = FastAPI(
-    title="ArmorIQ API",
+    title="Watchtower API",
     description="AI Agent Security Monitoring API",
     version="1.0.0"
 )
@@ -74,7 +74,7 @@ def get_or_create_agent(agent_id: str) -> HRAgent:
 
 @app.get("/")
 async def root():
-    return {"status": "ok", "service": "ArmorIQ API"}
+    return {"status": "ok", "service": "Watchtower API"}
 
 
 @app.post("/api/chat", response_model=ChatResponse)

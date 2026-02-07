@@ -4,11 +4,14 @@ HR Compliance Policies
 IRCA, FCRA, EEOC, hiring, compensation, termination.
 """
 
+import logging
 from typing import Dict, Any, List
 from datetime import datetime
 from .base import (
     Policy, PolicyCategory, PolicyAction, PolicySeverity, PolicyResult,
 )
+
+logger = logging.getLogger("Compliance.HR")
 
 
 class HiringCompliancePolicy(Policy):
@@ -129,8 +132,8 @@ class CompensationPolicy(Policy):
                         f"Salary increase of {increase_pct:.1f}% exceeds 20% threshold",
                         "Requires executive approval for large increases",
                     )
-            except (TypeError, ValueError, ZeroDivisionError):
-                pass
+            except (TypeError, ValueError, ZeroDivisionError) as e:
+                logger.warning(f"Salary increase calculation failed: {e}, skipping increase check")
 
         return self._allow(f"Compensation within {level} band (${min_salary:,}-${max_salary:,})")
 
@@ -238,8 +241,8 @@ class LeaveManagementPolicy(Policy):
                     f"Insufficient leave balance ({balance} days available, {days_requested} requested)",
                     "Request fewer days or apply for unpaid leave",
                 )
-        except (TypeError, ValueError):
-            pass
+        except (TypeError, ValueError) as e:
+            logger.warning(f"Leave balance check failed: {e}, skipping balance validation")
 
         # Long leaves need manager approval
         try:
@@ -249,8 +252,8 @@ class LeaveManagementPolicy(Policy):
                         f"Leave over 10 days requires manager approval",
                         "Submit for manager approval",
                     )
-        except (TypeError, ValueError):
-            pass
+        except (TypeError, ValueError) as e:
+            logger.warning(f"Leave duration check failed: {e}, skipping duration validation")
 
         return self._allow("Leave request compliant")
 

@@ -1,7 +1,7 @@
 """
 Agentic Orchestrator
 ====================
-Central coordinator for multi-agent pipelines with ArmorIQ verification.
+Central coordinator for multi-agent pipelines with Watchtower verification.
 """
 
 import os
@@ -42,7 +42,7 @@ logger = logging.getLogger("Orchestrator")
 
 @dataclass
 class HandoffVerification:
-    """Result of ArmorIQ verification for agent handoff."""
+    """Result of Watchtower verification for agent handoff."""
     allowed: bool
     token_id: Optional[str] = None
     plan_hash: Optional[str] = None
@@ -75,7 +75,7 @@ class Orchestrator:
     Responsibilities:
     1. Plan pipelines from high-level goals
     2. Route tasks to appropriate agents
-    3. Verify EVERY handoff with ArmorIQ
+    3. Verify EVERY handoff with Watchtower
     4. Track drift across the pipeline
     5. Block pipeline if risk too high
     6. Request human approval when needed
@@ -92,36 +92,36 @@ class Orchestrator:
         self.state_store = get_state_store() if self.config.enable_persistence else None
         self.audit_logger = get_audit_logger() if self.config.enable_persistence else None
 
-        self.armoriq_client = None
+        self.watchtower_client = None
         self.pipelines: Dict[str, PipelineContext] = {}
         self.execution_lock = threading.Lock()
         self.executor = ThreadPoolExecutor(max_workers=self.config.max_parallel_tasks)
 
-        # Initialize ArmorIQ
-        self._init_armoriq()
+        # Initialize Watchtower
+        self._init_watchtower()
 
         # Register all agents
         self._register_agents()
 
         logger.info("Orchestrator initialized with advanced features")
 
-    def _init_armoriq(self):
-        """Initialize ArmorIQ SDK."""
-        api_key = os.getenv("ARMORIQ_API_KEY", "")
+    def _init_watchtower(self):
+        """Initialize Watchtower SDK."""
+        api_key = os.getenv("WATCHTOWER_API_KEY", "")
 
         try:
-            from armoriq_sdk import ArmorIQClient
+            from watchtower_sdk import WatchtowerClient
             if api_key.startswith("ak_"):
-                self.armoriq_client = ArmorIQClient(
+                self.watchtower_client = WatchtowerClient(
                     api_key=api_key,
-                    user_id=os.getenv("ARMORIQ_USER_ID", "orchestrator"),
-                    agent_id=os.getenv("ARMORIQ_AGENT_ID", "orchestrator-main")
+                    user_id=os.getenv("WATCHTOWER_USER_ID", "orchestrator"),
+                    agent_id=os.getenv("WATCHTOWER_AGENT_ID", "orchestrator-main")
                 )
-                logger.info("ArmorIQ SDK initialized (LIVE MODE)")
+                logger.info("Watchtower SDK initialized (LIVE MODE)")
             else:
-                logger.warning("No valid ArmorIQ API key - using local policies only")
+                logger.warning("No valid Watchtower API key - using local policies only")
         except ImportError:
-            logger.warning("armoriq-sdk not installed")
+            logger.warning("watchtower-sdk not installed")
 
     def _register_agents(self):
         """Register all available agents."""
@@ -295,12 +295,12 @@ class Orchestrator:
         ))
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # ARMORIQ VERIFICATION
+    # WATCHTOWER VERIFICATION
     # ═══════════════════════════════════════════════════════════════════════════
 
     def verify_handoff(self, from_agent: str, to_agent: str, task: Task, context: PipelineContext) -> HandoffVerification:
         """
-        Verify agent handoff with ArmorIQ and local policies.
+        Verify agent handoff with Watchtower and local policies.
 
         This is called BEFORE every task execution to ensure:
         1. The receiving agent is allowed to perform the action
@@ -316,24 +316,24 @@ class Orchestrator:
             }]
         }
 
-        # Get token from ArmorIQ
+        # Get token from Watchtower
         token_id = None
         plan_hash = None
 
-        if self.armoriq_client:
+        if self.watchtower_client:
             try:
-                plan = self.armoriq_client.capture_plan(
+                plan = self.watchtower_client.capture_plan(
                     llm=to_agent,
                     prompt=f"Execute {task.name}: {json.dumps(task.payload)[:100]}",
                     plan=plan_structure
                 )
-                token = self.armoriq_client.get_intent_token(plan)
+                token = self.watchtower_client.get_intent_token(plan)
                 token_id = token.token_id if hasattr(token, 'token_id') else None
                 plan_hash = token.plan_hash[:16] if hasattr(token, 'plan_hash') else None
 
                 # Log token
                 if self.audit_logger and token_id:
-                    self.audit_logger.log_armoriq_token(
+                    self.audit_logger.log_watchtower_token(
                         context.pipeline_id,
                         task.task_id,
                         to_agent,
@@ -341,7 +341,7 @@ class Orchestrator:
                         plan_hash or ""
                     )
             except Exception as e:
-                logger.error(f"ArmorIQ error: {e}")
+                logger.error(f"Watchtower error: {e}")
 
         # Apply local policies via policy engine
         policy_result, all_results = self.policy_engine.evaluate(
@@ -445,7 +445,7 @@ class Orchestrator:
 
             task.agent_id = agent_info.agent_id
 
-            # ARMORIQ: Verify handoff
+            # WATCHTOWER: Verify handoff
             verification = self.verify_handoff(previous_agent, agent_info.agent_id, task, context)
 
             if callbacks.get("on_handoff"):
@@ -504,7 +504,7 @@ class Orchestrator:
                     blocked_reason=verification.reason,
                     policy_triggered=verification.policy_triggered,
                     suggestion=verification.suggestion,
-                    armoriq_token=verification.token_id,
+                    watchtower_token=verification.token_id,
                     risk_score=verification.risk_score
                 )
                 context.record_result(task.task_id, result)
@@ -577,7 +577,7 @@ class Orchestrator:
                 agent_info.current_task = task.task_id
 
                 result = agent_info.executor(task, context)
-                result.armoriq_token = verification.token_id
+                result.watchtower_token = verification.token_id
                 result.risk_score = verification.risk_score
 
                 context.record_result(task.task_id, result)

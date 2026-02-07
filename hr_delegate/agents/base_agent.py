@@ -1,9 +1,9 @@
 """
-HR Agent Base Class with LLM + ArmorIQ Integration
+HR Agent Base Class with LLM + Watchtower Integration
 ===================================================
 All agents inherit from this and use:
 - LLM for reasoning and decision-making
-- ArmorIQ for intent verification and tool invocation
+- Watchtower for intent verification and tool invocation
 - TIRS for temporal drift detection
 """
 
@@ -17,7 +17,7 @@ from datetime import datetime
 # Add paths for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from hr_delegate.policies.armoriq_sdk import ArmorIQWrapper, get_armoriq, PolicyVerdict
+from hr_delegate.policies.watchtower_sdk import WatchtowerWrapper, get_watchtower, PolicyVerdict
 
 # LLM Integration
 try:
@@ -54,19 +54,19 @@ logging.basicConfig(level=logging.INFO, format='[%(name)s] %(message)s')
 
 class HRAgent:
     """
-    Base HR Agent with LLM + ArmorIQ + TIRS Integration
+    Base HR Agent with LLM + Watchtower + TIRS Integration
     =====================================================
     
     Every agent action goes through:
     1. LLM - Reasoning and decision-making
-    2. ArmorIQ - Policy verification + tool invocation
+    2. Watchtower - Policy verification + tool invocation
     3. TIRS - Temporal drift detection & plan simulation
     
     Key methods:
     - reason(question): Ask LLM to reason about something
     - decide(options): Ask LLM to choose between options
     - plan(goal): Ask LLM to create a plan
-    - execute_tool(mcp, action, params): Execute tool through ArmorIQ
+    - execute_tool(mcp, action, params): Execute tool through Watchtower
     """
 
     def __init__(self, name: str, primary_intent: str):
@@ -80,8 +80,8 @@ class HRAgent:
             mode = self.llm.mode.value if hasattr(self.llm.mode, 'value') else 'unknown'
             self.logger.info(f"🤖 LLM enabled ({mode} mode)")
 
-        # ARMORIQ: Get the shared client for intent verification + tool invocation
-        self.armoriq = get_armoriq()
+        # WATCHTOWER: Get the shared client for intent verification + tool invocation
+        self.watchtower = get_watchtower()
 
         # TIRS: Get temporal intent risk engine
         self.tirs = get_tirs() if TIRS_AVAILABLE else None
@@ -118,9 +118,9 @@ class HRAgent:
         if self._metrics:
             self._metrics.gauge("active_agents").dec({"agent": self.name})
 
-        # Print ArmorIQ summary
-        report = self.armoriq.get_audit_report()
-        self.logger.info(f"📊 ArmorIQ Session: {report['total']} intents | "
+        # Print Watchtower summary
+        report = self.watchtower.get_audit_report()
+        self.logger.info(f"📊 Watchtower Session: {report['total']} intents | "
                         f"✅ {report['allowed']} | 🛑 {report['denied']} | ⚠️ {report['modified']}")
 
         # Print TIRS summary
@@ -154,12 +154,12 @@ class HRAgent:
 
         return True, "OK"
 
-    def execute_with_armoriq(self, intent_type: str, payload: Dict, description: str) -> Tuple[bool, str, Dict]:
+    def execute_with_watchtower(self, intent_type: str, payload: Dict, description: str) -> Tuple[bool, str, Dict]:
         """
         ═══════════════════════════════════════════════════════════════
-        ARMORIQ + TIRS INTENT VERIFICATION
+        WATCHTOWER + TIRS INTENT VERIFICATION
         ═══════════════════════════════════════════════════════════════
-        Every action MUST go through ArmorIQ and TIRS before execution.
+        Every action MUST go through Watchtower and TIRS before execution.
         """
         # Check if agent can continue
         can_continue, reason = self.check_status()
@@ -167,10 +167,10 @@ class HRAgent:
             self.logger.critical(f"🛑 Agent cannot continue: {reason}")
             return False, reason, payload
 
-        self.logger.info(f"📋 Requesting ArmorIQ verification: {description}")
+        self.logger.info(f"📋 Requesting Watchtower verification: {description}")
 
-        # CALL ARMORIQ
-        result = self.armoriq.capture_intent(intent_type, payload, self.name)
+        # CALL WATCHTOWER
+        result = self.watchtower.capture_intent(intent_type, payload, self.name)
 
         # Determine capabilities from intent type
         capabilities = self._extract_capabilities(intent_type, payload)
@@ -199,14 +199,14 @@ class HRAgent:
                 return False, "Agent paused by TIRS", payload
 
         if not result.allowed:
-            self.logger.critical(f"🛡️  ArmorIQ BLOCKED: {result.reason}")
+            self.logger.critical(f"🛡️  Watchtower BLOCKED: {result.reason}")
             return False, result.reason, payload
 
         if result.verdict == PolicyVerdict.MODIFY:
-            self.logger.warning(f"🛡️  ArmorIQ MODIFIED: {result.reason}")
+            self.logger.warning(f"🛡️  Watchtower MODIFIED: {result.reason}")
             return True, result.reason, result.modified_payload
 
-        self.logger.info(f"🛡️  ArmorIQ APPROVED | ID: {result.intent_id}")
+        self.logger.info(f"🛡️  Watchtower APPROVED | ID: {result.intent_id}")
         return True, "Approved", payload
 
     def simulate_plan(self, plan: List[Dict]) -> Optional[TIRSResult]:
@@ -268,7 +268,7 @@ class HRAgent:
 
     # Backward compatibility
     def execute_with_compliance(self, intent_type: str, payload: Dict, description: str) -> Tuple[bool, str, Dict]:
-        return self.execute_with_armoriq(intent_type, payload, description)
+        return self.execute_with_watchtower(intent_type, payload, description)
 
     # ═══════════════════════════════════════════════════════════════════════════════
     # LLM-POWERED REASONING METHODS
@@ -353,17 +353,17 @@ Primary function: {self.primary_intent}
         return plan
 
     # ═══════════════════════════════════════════════════════════════════════════════
-    # TOOL EXECUTION THROUGH ARMORIQ
+    # TOOL EXECUTION THROUGH WATCHTOWER
     # ═══════════════════════════════════════════════════════════════════════════════
 
     def execute_tool(self, mcp: str, action: str, params: Dict, description: str = None) -> Dict[str, Any]:
         """
-        Execute a tool through ArmorIQ's invoke() proxy.
+        Execute a tool through Watchtower's invoke() proxy.
         
         This is the PROPER way to execute tools in an agentic system:
         1. Agent decides to use a tool (via LLM or programmatically)
-        2. ArmorIQ verifies the intent and gets a token
-        3. Tool is executed through ArmorIQ.invoke()
+        2. Watchtower verifies the intent and gets a token
+        3. Tool is executed through Watchtower.invoke()
         4. Result is returned to agent
         
         Args:
@@ -389,12 +389,12 @@ Primary function: {self.primary_intent}
         
         self.logger.info(f"🔧 Executing tool: {intent_type}")
         
-        # Track ArmorIQ intent
+        # Track Watchtower intent
         if self._metrics:
-            self._metrics.counter("armoriq_intents_total").inc({"agent": self.name, "mcp": mcp})
+            self._metrics.counter("watchtower_intents_total").inc({"agent": self.name, "mcp": mcp})
         
-        # Step 1: Verify intent with ArmorIQ
-        result = self.armoriq.capture_intent(intent_type, params, self.name)
+        # Step 1: Verify intent with Watchtower
+        result = self.watchtower.capture_intent(intent_type, params, self.name)
         
         # Step 2: Track with TIRS
         if self.tirs:
@@ -422,15 +422,15 @@ Primary function: {self.primary_intent}
         if not result.allowed:
             self.logger.warning(f"🛑 Tool blocked: {result.reason}")
             if self._metrics:
-                self._metrics.counter("armoriq_denials_total").inc({"agent": self.name, "mcp": mcp})
+                self._metrics.counter("watchtower_denials_total").inc({"agent": self.name, "mcp": mcp})
             return {"success": False, "error": result.reason, "policy": result.policy_triggered}
         
-        # Step 4: Use modified payload if ArmorIQ modified it
+        # Step 4: Use modified payload if Watchtower modified it
         final_params = result.modified_payload or params
         
-        # Step 5: Execute through ArmorIQ.invoke()
-        self.logger.info(f"⚡ Invoking {mcp}.{action} through ArmorIQ...")
-        invoke_result = self.armoriq.invoke(
+        # Step 5: Execute through Watchtower.invoke()
+        self.logger.info(f"⚡ Invoking {mcp}.{action} through Watchtower...")
+        invoke_result = self.watchtower.invoke(
             mcp=mcp,
             action=action,
             params=final_params,
@@ -478,7 +478,7 @@ Primary function: {self.primary_intent}
             return {"success": False, "error": invoke_result.get("error", "Unknown error")}
 
     def get_audit_summary(self) -> Dict:
-        return self.armoriq.get_audit_report()
+        return self.watchtower.get_audit_report()
 
     def get_tirs_status(self) -> Optional[Dict]:
         """Get TIRS status for this agent."""

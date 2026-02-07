@@ -28,7 +28,7 @@ class BiasDetector:
     """NLP-powered bias and non-inclusive language detector."""
     
     def __init__(self):
-        self.logger = logging.getLogger("ArmorIQ_BiasDetector")
+        self.logger = logging.getLogger("Watchtower_BiasDetector")
         
         # Initialize NLP models
         self._nlp = None
@@ -271,7 +271,7 @@ class PIIDetector:
     """
     
     def __init__(self):
-        self.logger = logging.getLogger("ArmorIQ_PIIDetector")
+        self.logger = logging.getLogger("Watchtower_PIIDetector")
         self._nlp = None
         
         # NER entity types that are PII
@@ -431,7 +431,7 @@ class BlindScreener:
     """
     
     def __init__(self):
-        self.logger = logging.getLogger("ArmorIQ_BlindScreener")
+        self.logger = logging.getLogger("Watchtower_BlindScreener")
         self.pii_detector = PIIDetector()
         
         # Fields that should ALWAYS be redacted (even without NER)
@@ -543,7 +543,7 @@ class BlindScreener:
 
 class ComplianceEngine:
     def __init__(self):
-        self.logger = logging.getLogger("ArmorIQ_Policy_Engine")
+        self.logger = logging.getLogger("Watchtower_Policy_Engine")
         
         # Initialize NLP-powered detectors
         self.bias_detector = BiasDetector()
@@ -583,7 +583,7 @@ class ComplianceEngine:
 
     def check_intent(self, intent_type, payload, user_role="agent"):
         """
-        Main entry point for ArmorIQ Intent Verification.
+        Main entry point for Watchtower Intent Verification.
         Returns: (allowed: bool, reason: str, modified_payload: dict)
         """
         if intent_type == "schedule_interview":
