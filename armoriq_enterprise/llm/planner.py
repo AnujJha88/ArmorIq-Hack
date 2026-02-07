@@ -273,6 +273,12 @@ class GoalPlanner:
             }
         )
 
+        # Handle None or invalid recovery response
+        if not recovery or not isinstance(recovery, dict):
+            logger.warning(f"Plan {plan.plan_id} recovery failed - invalid response")
+            plan.status = PlanStatus.FAILED
+            return plan
+
         if not recovery.get("recoverable", False):
             logger.warning(f"Plan {plan.plan_id} is not recoverable")
             plan.status = PlanStatus.FAILED
