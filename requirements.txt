@@ -1,0 +1,16 @@
+# TIRS: Temporal Intent Risk & Simulation
+# Core Dependencies
+
+numpy>=1.24.0                    # Vector math for embeddings
+
+# Optional: Better embeddings (falls back to hash-based if not installed)
+# sentence-transformers>=2.2.0
+
+# Web UI (optional)
+# flask>=3.0.0
+
+# Data validation
+# pydantic>=2.0.0
+
+# Date parsing
+python-dateutil>=2.8.0
