@@ -1,0 +1,5 @@
+{
+  "name": "Global Default",
+  "description": "Base policy for all tenants",
+  "overrides": {}
+}

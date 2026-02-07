@@ -9,16 +9,13 @@ allowing TIRS to test plans before execution.
 
 from typing import Dict, Any
 
-# Re-export stubs from simulator
-from tirs.simulator import (
-    MCPStub,
-    HRISStub,
-    EmailStub,
-    CalendarStub,
-    PayrollStub,
-    OfferStub,
-    PerformanceStub
-)
+from .base_stub import MCPStub
+from .hris_stub import HRISStub
+from .email_stub import EmailStub
+from .calendar_stub import CalendarStub
+from .payroll_stub import PayrollStub
+from .offer_stub import OfferStub
+from .performance_stub import PerformanceStub
 
 __all__ = [
     "MCPStub",

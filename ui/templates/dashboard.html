@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TIRS Dashboard</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <span class="logo">🛡️</span>
+            <span class="brand-text">TIRS Dashboard</span>
+        </div>
+        <div class="nav-links">
+            <a href="/" class="nav-link active">Dashboard</a>
+            <a href="/drift" class="nav-link">Drift Graph</a>
+            <a href="/audit" class="nav-link">Audit Log</a>
+        </div>
+        <div class="nav-status">
+            <span class="status-indicator online"></span>
+            <span>System Online</span>
+        </div>
+    </nav>
+
+    <main class="dashboard">
+        <header class="dashboard-header">
+            <h1>Agent Monitoring</h1>
+            <p class="timestamp">Last updated: {{ timestamp }}</p>
+        </header>
+
+        <section class="stats-row">
+            <div class="stat-card">
+                <div class="stat-value">{{ agents|length }}</div>
+                <div class="stat-label">Total Agents</div>
+            </div>
+            <div class="stat-card active">
+                <div class="stat-value">{{ agents.values()|selectattr('status', 'equalto', 'ACTIVE')|list|length }}</div>
+                <div class="stat-label">Active</div>
+            </div>
+            <div class="stat-card paused">
+                <div class="stat-value">{{ agents.values()|selectattr('status', 'equalto', 'PAUSED')|list|length }}</div>
+                <div class="stat-label">Paused</div>
+            </div>
+            <div class="stat-card killed">
+                <div class="stat-value">{{ agents.values()|selectattr('status', 'equalto', 'KILLED')|list|length }}</div>
+                <div class="stat-label">Killed</div>
+            </div>
+        </section>
+
+        <section class="agent-grid">
+            <h2>Agent Status</h2>
+            <div class="agents-container">
+                {% for agent_id, agent in agents.items() %}
+                <div class="agent-card {{ agent.status|lower }}">
+                    <div class="agent-header">
+                        <span class="agent-id">{{ agent_id }}</span>
+                        <span class="agent-status {{ agent.status|lower }}">{{ agent.status }}</span>
+                    </div>
+                    <div class="agent-metrics">
+                        <div class="metric">
+                            <span class="metric-label">Risk Score</span>
+                            <div class="risk-bar">
+                                <div class="risk-fill {% if agent.risk_score >= 0.6 %}high{% elif agent.risk_score >= 0.3 %}medium{% else %}low{% endif %}" 
+                                     style="width: {{ (agent.risk_score * 100)|int }}%"></div>
+                            </div>
+                            <span class="metric-value">{{ "%.2f"|format(agent.risk_score) }}</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Actions Today</span>
+                            <span class="metric-value">{{ agent.actions_today }}</span>
+                        </div>
+                    </div>
+                    <div class="agent-actions">
+                        <button class="btn btn-small" onclick="viewDrift('{{ agent_id }}')">View Drift</button>
+                        {% if agent.status == 'PAUSED' %}
+                        <button class="btn btn-small btn-resume">Resume</button>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="recent-activity">
+            <h2>Recent Activity</h2>
+            <div class="activity-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Agent</th>
+                            <th>Event</th>
+                            <th>Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for event in audit_recent %}
+                        <tr class="event-{{ event.event|lower|replace('_', '-') }}">
+                            <td>{{ event.time }}</td>
+                            <td><code>{{ event.agent }}</code></td>
+                            <td><span class="event-badge {{ event.event|lower|replace('_', '-') }}">{{ event.event }}</span></td>
+                            <td>{{ event.details }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <a href="/audit" class="view-all-link">View All Events →</a>
+        </section>
+
+        <section class="quick-actions">
+            <h2>Quick Actions</h2>
+            <div class="action-buttons">
+                <button class="btn" onclick="reloadPolicies()">🔄 Reload Policies</button>
+                <button class="btn" onclick="window.location.href='/drift'">📊 View Drift Charts</button>
+                <button class="btn" onclick="window.location.href='/audit'">📋 Full Audit Log</button>
+            </div>
+        </section>
+    </main>
+
+    <script src="/static/api.js"></script>
+    <script>
+        function viewDrift(agentId) {
+            window.location.href = `/drift?agent=${agentId}`;
+        }
+
+        async function reloadPolicies() {
+            try {
+                const result = await fetch('/api/policy/reload', { method: 'POST' });
+                const data = await result.json();
+                if (data.success) {
+                    alert(`Policies reloaded! Version: ${data.version}`);
+                } else {
+                    alert('Failed to reload policies: ' + (data.error || 'Unknown error'));
+                }
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+        }
+
+        // Auto-refresh every 30 seconds
+        setTimeout(() => location.reload(), 30000);
+    </script>
+</body>
+</html>
