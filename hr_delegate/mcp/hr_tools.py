@@ -1,5 +1,6 @@
 import json
 import sys
+import os
 import logging
 import random
 
@@ -7,12 +8,12 @@ import random
 logging.basicConfig(level=logging.INFO, stream=sys.stderr)
 logger = logging.getLogger("HR_MCP_Server")
 
-# Load Data
-DATA_DIR = r"d:\fun stuff\vibe coding shit\thing 2\hr_delegate\data"
+# Load Data - compute path relative to this file
+DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
 
 def load_json(filename):
     try:
-        with open(f"{DATA_DIR}\\{filename}", 'r') as f:
+        with open(os.path.join(DATA_DIR, filename), 'r') as f:
             return json.load(f)
     except FileNotFoundError:
         return []

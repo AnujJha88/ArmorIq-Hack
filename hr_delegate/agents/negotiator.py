@@ -1,9 +1,13 @@
 from base_agent import HRAgent
 import json
 import sys
+import os
 from typing import Dict, Optional, Tuple, List
 from datetime import datetime
 import random
+
+# Compute data directory relative to this file
+_DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
 
 class NegotiatorAgent(HRAgent):
     """
@@ -34,7 +38,7 @@ class NegotiatorAgent(HRAgent):
     def _load_salary_bands(self):
         """Load salary bands from database."""
         try:
-            with open(r"d:\fun stuff\vibe coding shit\thing 2\hr_delegate\data\salary_bands.json") as f:
+            with open(os.path.join(_DATA_DIR, "salary_bands.json")) as f:
                 self.salary_bands = json.load(f)
         except:
             self.salary_bands = {

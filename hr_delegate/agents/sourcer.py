@@ -1,8 +1,12 @@
 from base_agent import HRAgent
 import json
 import sys
+import os
 from typing import List, Dict, Optional
 from datetime import datetime
+
+# Compute data directory relative to this file
+_DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
 
 class SourcerAgent(HRAgent):
     """
@@ -40,7 +44,7 @@ class SourcerAgent(HRAgent):
         self.logger.info(f"🔍 Searching candidates: keywords={keywords}, filters={filters}")
         
         # Load mock data
-        with open(r"d:\fun stuff\vibe coding shit\thing 2\hr_delegate\data\resumes.json") as f:
+        with open(os.path.join(_DATA_DIR, "resumes.json")) as f:
             candidates = json.load(f)
         
         results = []

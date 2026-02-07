@@ -1,7 +1,8 @@
 import subprocess
 import os
 
-AGENTS_DIR = r"d:\fun stuff\vibe coding shit\thing 2\hr_delegate\agents"
+# Compute agents directory relative to this file
+AGENTS_DIR = os.path.join(os.path.dirname(__file__), "agents")
 
 def run_test(name, cmd_args):
     print(f"\n--- TESTING {name} ---")

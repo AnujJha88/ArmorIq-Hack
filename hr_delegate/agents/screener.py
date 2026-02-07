@@ -1,9 +1,13 @@
 from base_agent import HRAgent
 import json
 import sys
+import os
 import re
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime
+
+# Compute data directory relative to this file
+_DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
 
 class ScreenerAgent(HRAgent):
     """
@@ -53,7 +57,7 @@ class ScreenerAgent(HRAgent):
     # ─────────────────────────────────────────────────────────────
     def load_candidate(self, candidate_id: str) -> Optional[Dict]:
         """Load candidate data from database."""
-        with open(r"d:\fun stuff\vibe coding shit\thing 2\hr_delegate\data\resumes.json") as f:
+        with open(os.path.join(_DATA_DIR, "resumes.json")) as f:
             candidates = json.load(f)
         
         for c in candidates:
