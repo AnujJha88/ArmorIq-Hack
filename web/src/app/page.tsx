@@ -177,9 +177,9 @@ export default function Dashboard() {
                         {action.suggestion && (
                           <p style={{ color: 'var(--text-secondary)' }}>Suggestion: {action.suggestion}</p>
                         )}
-                        {action.result && (
+                        {action.result !== undefined && action.result !== null && (
                           <pre className="mt-2 text-xs overflow-x-auto p-2 rounded" style={{ background: 'var(--bg)' }}>
-                            {JSON.stringify(action.result, null, 2)}
+                            {JSON.stringify(action.result as object, null, 2)}
                           </pre>
                         )}
                       </div>
