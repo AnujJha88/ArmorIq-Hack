@@ -256,24 +256,330 @@ class BiasDetector:
         return found
 
 
+class PIIDetector:
+    """
+    NLP-powered PII (Personally Identifiable Information) detector.
+    
+    Uses spaCy Named Entity Recognition to detect:
+    - Names (PERSON)
+    - Organizations (ORG)
+    - Locations/Addresses (GPE, LOC, FAC)
+    - Dates (DATE)
+    - Financial info (MONEY, CARDINAL)
+    
+    Plus regex patterns for structured data like SSN, phone, email, credit cards.
+    """
+    
+    def __init__(self):
+        self.logger = logging.getLogger("ArmorIQ_PIIDetector")
+        self._nlp = None
+        
+        # NER entity types that are PII
+        self.pii_entity_types = {
+            "PERSON": "name",
+            "GPE": "location",           # Countries, cities, states
+            "LOC": "location",           # Non-GPE locations
+            "FAC": "facility",           # Buildings, airports, highways
+            "ORG": "organization",
+            "DATE": "date",
+            "MONEY": "financial",
+            "CARDINAL": "number",
+            "NORP": "demographic",       # Nationalities, religious/political groups
+        }
+        
+        # Regex patterns for structured PII (always run as backup)
+        self.structured_patterns = {
+            "ssn": re.compile(r"\b\d{3}-\d{2}-\d{4}\b"),
+            "ssn_nodash": re.compile(r"\b\d{9}\b"),
+            "phone_us": re.compile(r"\b(\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b"),
+            "phone_intl": re.compile(r"\+\d{1,3}[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}\b"),
+            "email": re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"),
+            "credit_card": re.compile(r"\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b"),
+            "passport": re.compile(r"\b[A-Z]{1,2}\d{6,9}\b"),
+            "drivers_license": re.compile(r"\b[A-Z]{1,2}\d{5,8}\b"),
+            "ip_address": re.compile(r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b"),
+            "dob": re.compile(r"\b(0[1-9]|1[0-2])[-/](0[1-9]|[12]\d|3[01])[-/](\d{2}|\d{4})\b"),
+            "bank_account": re.compile(r"\b\d{8,17}\b"),
+            "zip_code": re.compile(r"\b\d{5}(-\d{4})?\b"),
+        }
+        
+        # High-sensitivity patterns (always block/redact in external comms)
+        self.high_sensitivity = {"ssn", "ssn_nodash", "credit_card", "bank_account", "passport"}
+        
+    @property
+    def nlp(self):
+        """Lazy-load spaCy model for NER."""
+        if self._nlp is None and SPACY_AVAILABLE:
+            try:
+                self._nlp = spacy.load("en_core_web_md")
+                self.logger.info("Loaded spaCy model for NER-based PII detection")
+            except OSError:
+                self.logger.warning("spaCy model not found for PII detection")
+                self._nlp = False
+        return self._nlp if self._nlp else None
+    
+    def detect_pii(self, text: str, context: str = "general") -> Dict[str, Any]:
+        """
+        Detect PII in text using NLP + regex patterns.
+        
+        Args:
+            text: The text to analyze
+            context: 'internal', 'external', 'blind_screening' - affects sensitivity
+            
+        Returns:
+            Dict with: has_pii, entities, patterns, redacted_text, risk_level
+        """
+        entities_found = []
+        patterns_found = []
+        redacted_text = text
+        
+        # 1. NER-based detection (if spaCy available)
+        if self.nlp:
+            try:
+                doc = self.nlp(text)
+                for ent in doc.ents:
+                    if ent.label_ in self.pii_entity_types:
+                        pii_type = self.pii_entity_types[ent.label_]
+                        entities_found.append({
+                            "type": pii_type,
+                            "ner_label": ent.label_,
+                            "text": ent.text,
+                            "start": ent.start_char,
+                            "end": ent.end_char
+                        })
+                        # Redact in output
+                        redacted_text = redacted_text.replace(
+                            ent.text, f"[{pii_type.upper()}_REDACTED]"
+                        )
+            except Exception as e:
+                self.logger.debug(f"NER detection failed: {e}")
+        
+        # 2. Regex pattern detection (always runs)
+        for pattern_name, pattern in self.structured_patterns.items():
+            matches = pattern.findall(text)
+            for match in matches:
+                match_text = match if isinstance(match, str) else match[0] if match else ""
+                if match_text and match_text not in [p.get('text') for p in patterns_found]:
+                    patterns_found.append({
+                        "type": pattern_name,
+                        "text": match_text,
+                        "high_sensitivity": pattern_name in self.high_sensitivity
+                    })
+                    # Redact in output
+                    redacted_text = redacted_text.replace(
+                        match_text, f"[{pattern_name.upper()}_REDACTED]"
+                    )
+        
+        # Calculate risk level
+        has_high_sensitivity = any(p.get("high_sensitivity") for p in patterns_found)
+        total_pii = len(entities_found) + len(patterns_found)
+        
+        if has_high_sensitivity:
+            risk_level = "critical"
+        elif total_pii > 5:
+            risk_level = "high"
+        elif total_pii > 2:
+            risk_level = "medium"
+        elif total_pii > 0:
+            risk_level = "low"
+        else:
+            risk_level = "none"
+        
+        return {
+            "has_pii": total_pii > 0,
+            "entity_count": len(entities_found),
+            "pattern_count": len(patterns_found),
+            "entities": entities_found,
+            "patterns": patterns_found,
+            "redacted_text": redacted_text,
+            "risk_level": risk_level,
+            "high_sensitivity_detected": has_high_sensitivity
+        }
+    
+    def redact_text(self, text: str, preserve_types: List[str] = None) -> str:
+        """
+        Redact all PII from text.
+        
+        Args:
+            text: Text to redact
+            preserve_types: Optional list of PII types to NOT redact (e.g., ['email'])
+        """
+        preserve_types = preserve_types or []
+        result = self.detect_pii(text)
+        
+        redacted = text
+        
+        # Redact NER entities
+        for ent in sorted(result["entities"], key=lambda x: x["start"], reverse=True):
+            if ent["type"] not in preserve_types:
+                redacted = redacted[:ent["start"]] + f"[{ent['type'].upper()}_REDACTED]" + redacted[ent["end"]:]
+        
+        # Redact pattern matches
+        for pat in result["patterns"]:
+            if pat["type"] not in preserve_types:
+                redacted = redacted.replace(pat["text"], f"[{pat['type'].upper()}_REDACTED]")
+        
+        return redacted
+
+
+class BlindScreener:
+    """
+    NLP-powered blind screening for candidate data.
+    
+    Uses NER to automatically detect and redact identifying information,
+    going beyond static field lists to catch PII in any text field.
+    """
+    
+    def __init__(self):
+        self.logger = logging.getLogger("ArmorIQ_BlindScreener")
+        self.pii_detector = PIIDetector()
+        
+        # Fields that should ALWAYS be redacted (even without NER)
+        self.always_redact_fields = {
+            "name", "full_name", "first_name", "last_name",
+            "email", "phone", "address", "street", "city", "state", "zip",
+            "ssn", "social_security", "date_of_birth", "dob", "birthday",
+            "gender", "sex", "race", "ethnicity", "nationality",
+            "photo", "picture", "image", "headshot",
+            "linkedin", "github", "twitter", "social_media",
+            "university", "college", "school", "education_institution",
+            "graduation_year", "age"
+        }
+        
+        # Fields to PRESERVE (job-relevant, non-identifying)
+        self.preserve_fields = {
+            "skills", "experience_years", "certifications", "projects",
+            "job_title", "role", "level", "department", "id", "candidate_id",
+            "status", "score", "recommendation", "notes_redacted"
+        }
+    
+    def blind_screen(self, candidate_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Apply blind screening to candidate data.
+        
+        Redacts identifying information while preserving job-relevant details.
+        Uses NLP to detect PII in text fields, not just field names.
+        
+        Args:
+            candidate_data: Raw candidate dictionary
+            
+        Returns:
+            Blinded candidate data with PII redacted
+        """
+        blinded = {}
+        redaction_log = []
+        
+        for key, value in candidate_data.items():
+            key_lower = key.lower()
+            
+            # Always redact certain fields entirely
+            if key_lower in self.always_redact_fields:
+                blinded[key] = "[REDACTED]"
+                redaction_log.append({"field": key, "reason": "always_redact"})
+                continue
+            
+            # Preserve known safe fields
+            if key_lower in self.preserve_fields:
+                blinded[key] = value
+                continue
+            
+            # For text fields, use NLP to detect and redact embedded PII
+            if isinstance(value, str) and len(value) > 10:
+                pii_result = self.pii_detector.detect_pii(value, context="blind_screening")
+                if pii_result["has_pii"]:
+                    blinded[key] = pii_result["redacted_text"]
+                    redaction_log.append({
+                        "field": key,
+                        "reason": "pii_detected",
+                        "pii_count": pii_result["entity_count"] + pii_result["pattern_count"]
+                    })
+                else:
+                    blinded[key] = value
+            elif isinstance(value, list):
+                # For lists, check each item
+                blinded[key] = [
+                    self._redact_if_pii(item) if isinstance(item, str) else item
+                    for item in value
+                ]
+            elif isinstance(value, dict):
+                # Recursively blind nested dicts
+                blinded[key] = self.blind_screen(value)
+            else:
+                blinded[key] = value
+        
+        # Add metadata about redaction
+        blinded["_blind_screening"] = {
+            "applied": True,
+            "redaction_count": len(redaction_log),
+            "method": "nlp_ner" if self.pii_detector.nlp else "pattern_only"
+        }
+        
+        return blinded
+    
+    def _redact_if_pii(self, text: str) -> str:
+        """Redact text if it contains PII."""
+        if len(text) < 5:
+            return text
+        result = self.pii_detector.detect_pii(text)
+        return result["redacted_text"] if result["has_pii"] else text
+    
+    def get_redaction_summary(self, original: Dict, blinded: Dict) -> Dict:
+        """Generate a summary of what was redacted."""
+        redacted_fields = []
+        for key in original:
+            if key in blinded:
+                if blinded[key] == "[REDACTED]":
+                    redacted_fields.append(key)
+                elif isinstance(original[key], str) and original[key] != blinded.get(key):
+                    redacted_fields.append(key)
+        
+        return {
+            "total_fields": len(original),
+            "redacted_fields": redacted_fields,
+            "redacted_count": len(redacted_fields),
+            "compliance": "BLIND_SCREENING_APPLIED"
+        }
+
+
 class ComplianceEngine:
     def __init__(self):
         self.logger = logging.getLogger("ArmorIQ_Policy_Engine")
         
-        # Initialize NLP-powered bias detector
+        # Initialize NLP-powered detectors
         self.bias_detector = BiasDetector()
+        self.pii_detector = PIIDetector()
+        self.blind_screener = BlindScreener()
         
         # Load policies if needed (for now hardcoded for demo speed)
         self.weekend_blocked = True
         self.work_hours = (9, 17)  # 9 AM to 5 PM
-        self.pii_patterns = {
-            "phone": r"\+?1?[-.]?\(?\d{3}\)?[-.]?\d{3}[-.]?\d{4}",
-            "email": r"[\w\.-]+@[\w\.-]+",
-            "ssn": r"\d{3}-\d{2}-\d{4}"
-        }
         
-        # Legacy fallback (kept for backwards compatibility, but bias_detector is preferred)
+        # Legacy fallback (kept for backwards compatibility)
         self.bias_terms = self.bias_detector.fallback_terms
+        # Legacy pii_patterns now handled by PIIDetector, but kept for API compat
+        self.pii_patterns = self.pii_detector.structured_patterns
+    
+    def blind_screen_candidate(self, candidate_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Apply NLP-powered blind screening to candidate data.
+        
+        Automatically detects and redacts PII using NER, not just static field names.
+        """
+        return self.blind_screener.blind_screen(candidate_data)
+    
+    def detect_pii(self, text: str) -> Dict[str, Any]:
+        """
+        Detect PII in text using NLP + regex patterns.
+        
+        Returns detailed analysis including entity types, risk level, and redacted text.
+        """
+        return self.pii_detector.detect_pii(text)
+    
+    def redact_pii(self, text: str, preserve_types: List[str] = None) -> str:
+        """
+        Redact all PII from text, optionally preserving certain types.
+        """
+        return self.pii_detector.redact_text(text, preserve_types)
 
     def check_intent(self, intent_type, payload, user_role="agent"):
         """
@@ -338,22 +644,35 @@ class ComplianceEngine:
             
             return False, msg, payload
 
-        # 2. PII Check
+        # 2. NLP-powered PII Check (external recipients only)
         # If sending to external domain (not @company.com)
         if not recipient.endswith("@company.com"):
-            redacted_body = body
-            redacted_count = 0
-            for label, pattern in self.pii_patterns.items():
-                # Don't redact the recipient's own email if it appears in body, but redact others
-                matches = re.findall(pattern, body)
-                for m in matches:
-                    if m != recipient:
-                        redacted_body = redacted_body.replace(m, f"[{label.upper()}_REDACTED]")
-                        redacted_count += 1
+            # Use NLP-powered PII detection
+            pii_result = self.pii_detector.detect_pii(body, context="external")
             
-            if redacted_count > 0:
+            if pii_result["has_pii"]:
+                # Get redacted text, but preserve recipient's email
+                redacted_body = pii_result["redacted_text"]
+                # Restore recipient email if it was redacted
+                if recipient in body and f"[EMAIL_REDACTED]" in redacted_body:
+                    redacted_body = redacted_body.replace("[EMAIL_REDACTED]", recipient, 1)
+                
+                total_pii = pii_result["entity_count"] + pii_result["pattern_count"]
+                risk = pii_result["risk_level"]
+                
+                # Block if high-sensitivity PII detected
+                if pii_result["high_sensitivity_detected"]:
+                    return False, f"Policy Violation: High-sensitivity PII detected (SSN/credit card/passport). Cannot send externally.", payload
+                
+                # Otherwise, auto-redact and allow
                 payload["body"] = redacted_body
-                return True, f"Modifying Intent: Redacted {redacted_count} PII fields for external transmission.", payload
+                
+                # Build informative message
+                entities = [e["type"] for e in pii_result["entities"][:3]]
+                patterns = [p["type"] for p in pii_result["patterns"][:3]]
+                detected_types = list(set(entities + patterns))
+                
+                return True, f"Modifying Intent: Redacted {total_pii} PII items ({', '.join(detected_types)}) for external transmission. Risk level: {risk}.", payload
 
         return True, "Communication Approved", payload
 
