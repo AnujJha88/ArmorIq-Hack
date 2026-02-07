@@ -1,7 +1,9 @@
 """
 Enterprise Base Agent
 =====================
-Base class for all domain agents with TIRS and compliance integration.
+Base class for all domain agents with TIRS, compliance, and LLM integration.
+
+Now supports AUTONOMOUS decision-making via LLM reasoning.
 """
 
 import logging
@@ -19,6 +21,11 @@ from ..tirs.drift.detector import RiskLevel, AgentStatus
 # Import Compliance
 from ..compliance import get_compliance_engine, ComplianceEngine
 from ..compliance.policies.base import PolicyCategory, PolicyAction
+
+# Import LLM for autonomous reasoning
+from ..llm import get_enterprise_llm, get_reasoning_engine
+from ..llm.service import DecisionContext, DecisionType
+from ..llm.reasoning import ReasoningMode
 
 logger = logging.getLogger("Enterprise.Agent")
 
@@ -101,6 +108,13 @@ class ActionResult:
     risk_score: float = 0.0
     risk_level: RiskLevel = RiskLevel.NOMINAL
 
+    # LLM Reasoning (NEW - for autonomous decisions)
+    reasoning: Optional[str] = None
+    confidence: float = 1.0
+    decision_type: Optional[str] = None
+    recommendations: List[str] = field(default_factory=list)
+    warnings: List[str] = field(default_factory=list)
+
     # Audit
     audit_entry_id: Optional[str] = None
     timestamp: datetime = field(default_factory=datetime.now)
@@ -115,6 +129,11 @@ class ActionResult:
             "policies_triggered": self.policies_triggered,
             "risk_score": self.risk_score,
             "risk_level": self.risk_level.value,
+            "reasoning": self.reasoning,
+            "confidence": self.confidence,
+            "decision_type": self.decision_type,
+            "recommendations": self.recommendations,
+            "warnings": self.warnings,
             "timestamp": self.timestamp.isoformat(),
         }
 
@@ -128,7 +147,13 @@ class EnterpriseAgent(ABC):
     - Compliance engine integration
     - Capability-based authorization
     - Audit logging
+    - LLM-powered autonomous reasoning (NEW)
     """
+
+    # Autonomous mode settings
+    AUTONOMOUS_MODE = True  # Enable/disable autonomous reasoning
+    AUTO_APPROVE_THRESHOLD = 0.85  # Confidence threshold for auto-approve
+    ESCALATION_THRESHOLD = 0.5  # Below this, escalate to human
 
     def __init__(self, config: AgentConfig):
         self.config = config
@@ -140,13 +165,19 @@ class EnterpriseAgent(ABC):
         self.tirs = get_advanced_tirs()
         self.compliance = get_compliance_engine()
 
+        # LLM for autonomous reasoning
+        self.llm = get_enterprise_llm()
+        self.reasoning_engine = get_reasoning_engine()
+
         # State
         self._action_count = 0
         self._blocked_count = 0
+        self._autonomous_decisions = 0
+        self._escalated_count = 0
         self._is_active = True
 
         self.logger = logging.getLogger(f"Agent.{config.name}")
-        self.logger.info(f"Initialized {config.name} with {len(config.capabilities)} capabilities")
+        self.logger.info(f"Initialized {config.name} with {len(config.capabilities)} capabilities (autonomous={self.AUTONOMOUS_MODE})")
 
     @property
     def status(self) -> AgentStatus:
@@ -306,6 +337,215 @@ class EnterpriseAgent(ABC):
                 risk_level=tirs_result.risk_level,
             )
 
+    async def autonomous_execute(
+        self,
+        action: str,
+        payload: Dict[str, Any],
+        context: Optional[Dict[str, Any]] = None,
+        reasoning_mode: ReasoningMode = ReasoningMode.STANDARD,
+    ) -> ActionResult:
+        """
+        Execute an action with AUTONOMOUS LLM-powered decision-making.
+
+        This method:
+        1. Uses LLM to understand the intent
+        2. Reasons about whether to proceed
+        3. Makes intelligent decisions with explanations
+        4. Handles edge cases and uncertainties
+        5. Provides recommendations and warnings
+
+        Args:
+            action: Action to perform
+            payload: Action parameters
+            context: Request context
+            reasoning_mode: How deep to reason (QUICK, STANDARD, DEEP, CRITICAL)
+
+        Returns:
+            ActionResult with reasoning and confidence
+        """
+        context = context or {}
+        context["agent_id"] = self.agent_id
+        context["department"] = self.config.agent_type
+
+        self._action_count += 1
+        self._autonomous_decisions += 1
+
+        # Determine capability
+        capability = self._action_to_capability(action)
+
+        # Check basic capability
+        can_exec, reason = self.can_execute(capability) if capability else (True, "OK")
+        if not can_exec:
+            self._blocked_count += 1
+            return ActionResult(
+                success=False,
+                action=action,
+                agent_id=self.agent_id,
+                result_data={"error": reason},
+                compliance_passed=False,
+                reasoning="Capability check failed",
+                confidence=1.0,
+                decision_type="deny",
+            )
+
+        # Get compliance result
+        compliance_result = self.compliance.evaluate(
+            action=action,
+            payload=payload,
+            context=context,
+            categories=self.policy_categories,
+        )
+
+        # Get TIRS analysis
+        tirs_result = self.tirs.analyze_intent(
+            agent_id=self.agent_id,
+            intent_text=f"{action}: {str(payload)[:100]}",
+            capabilities={capability.value} if capability else {action},
+            was_allowed=compliance_result.allowed,
+        )
+
+        # Use LLM reasoning engine for intelligent decision
+        reasoning_result = self.reasoning_engine.reason_about_action(
+            agent_id=self.agent_id,
+            action=action,
+            payload=payload,
+            context=context,
+            compliance_result={
+                "allowed": compliance_result.allowed,
+                "policies_triggered": [r.policy_id for r in compliance_result.results if r.action != PolicyAction.ALLOW],
+                "suggestions": compliance_result.suggestions,
+            },
+            tirs_result={
+                "risk_score": tirs_result.risk_score,
+                "risk_level": tirs_result.risk_level.value,
+                "agent_status": tirs_result.agent_status.value,
+            },
+            mode=reasoning_mode,
+        )
+
+        # Log the reasoning
+        self.logger.info(
+            f"[AUTONOMOUS] {action}: proceed={reasoning_result.should_proceed}, "
+            f"confidence={reasoning_result.overall_confidence:.2f}, "
+            f"decision={reasoning_result.decision.decision_type.value}"
+        )
+
+        # Handle escalation
+        if reasoning_result.decision.decision_type == DecisionType.ESCALATE:
+            self._escalated_count += 1
+            return ActionResult(
+                success=False,
+                action=action,
+                agent_id=self.agent_id,
+                result_data={
+                    "status": "escalated",
+                    "escalate_to": reasoning_result.decision.escalate_to,
+                    "reason": reasoning_result.decision.escalation_reason,
+                },
+                compliance_passed=compliance_result.allowed,
+                risk_score=tirs_result.risk_score,
+                risk_level=tirs_result.risk_level,
+                reasoning=reasoning_result.decision.reasoning,
+                confidence=reasoning_result.overall_confidence,
+                decision_type="escalate",
+                recommendations=reasoning_result.recommendations,
+                warnings=reasoning_result.warnings,
+            )
+
+        # If reasoning says don't proceed
+        if not reasoning_result.should_proceed:
+            self._blocked_count += 1
+            return ActionResult(
+                success=False,
+                action=action,
+                agent_id=self.agent_id,
+                result_data={
+                    "status": "blocked_by_reasoning",
+                    "reason": reasoning_result.decision.reasoning,
+                },
+                compliance_passed=compliance_result.allowed,
+                policies_triggered=[r.policy_id for r in compliance_result.results if r.action != PolicyAction.ALLOW],
+                risk_score=tirs_result.risk_score,
+                risk_level=tirs_result.risk_level,
+                reasoning=reasoning_result.decision.reasoning,
+                confidence=reasoning_result.overall_confidence,
+                decision_type=reasoning_result.decision.decision_type.value,
+                recommendations=reasoning_result.recommendations,
+                warnings=reasoning_result.warnings,
+            )
+
+        # Apply modifications if decision suggests them
+        if reasoning_result.decision.modified_payload:
+            payload = {**payload, **reasoning_result.decision.modified_payload}
+            self.logger.info(f"[AUTONOMOUS] Payload modified by reasoning")
+
+        # Execute the action
+        try:
+            result_data = await self._execute_action(action, payload, context)
+
+            return ActionResult(
+                success=True,
+                action=action,
+                agent_id=self.agent_id,
+                result_data=result_data,
+                compliance_passed=True,
+                risk_score=tirs_result.risk_score,
+                risk_level=tirs_result.risk_level,
+                reasoning=reasoning_result.decision.reasoning,
+                confidence=reasoning_result.overall_confidence,
+                decision_type=reasoning_result.decision.decision_type.value,
+                recommendations=reasoning_result.recommendations,
+                warnings=reasoning_result.warnings,
+                audit_entry_id=tirs_result.audit_entry_id,
+            )
+
+        except Exception as e:
+            self.logger.error(f"[AUTONOMOUS] Action execution error: {e}")
+
+            # Use LLM to suggest recovery
+            recovery = self.llm.suggest_recovery(
+                failed_action=action,
+                error=str(e),
+                available_alternatives=[c.value for c in self.capabilities],
+                context=context,
+            )
+
+            return ActionResult(
+                success=False,
+                action=action,
+                agent_id=self.agent_id,
+                result_data={
+                    "error": str(e),
+                    "recovery_suggestions": recovery.get("suggestions", []),
+                    "escalation_needed": recovery.get("escalation_needed", True),
+                },
+                risk_score=tirs_result.risk_score,
+                risk_level=tirs_result.risk_level,
+                reasoning=f"Execution failed: {e}",
+                confidence=0.0,
+                decision_type="failed",
+                recommendations=[s.get("option", "") for s in recovery.get("suggestions", [])],
+                warnings=["Action failed during execution"],
+            )
+
+    async def understand_request(self, natural_language_request: str) -> Dict[str, Any]:
+        """
+        Use LLM to understand a natural language request.
+
+        Args:
+            natural_language_request: Human language request
+
+        Returns:
+            Dict with intent, action, parameters
+        """
+        available_actions = [c.value for c in self.capabilities]
+        return self.llm.understand_intent(natural_language_request, available_actions)
+
+    async def explain_last_decision(self) -> str:
+        """Get a human-readable explanation of the last decision."""
+        # This would be implemented with decision history
+        return "No recent decision to explain"
+
     @abstractmethod
     async def _execute_action(
         self,
@@ -353,6 +593,11 @@ class EnterpriseAgent(ABC):
             "risk_score": tirs_status.get("risk_score", 0.0),
             "is_throttled": tirs_status.get("is_throttled", False),
             "is_paused": tirs_status.get("is_paused", False),
+            # Autonomous mode stats
+            "autonomous_mode": self.AUTONOMOUS_MODE,
+            "autonomous_decisions": self._autonomous_decisions,
+            "escalated_count": self._escalated_count,
+            "llm_mode": self.llm.mode.value if self.llm else "unavailable",
         }
 
     def __repr__(self) -> str:
