@@ -1,0 +1,9 @@
+{
+  "name": "Engineering",
+  "description": "Engineering department policies",
+  "overrides": {
+    "salary_caps.L5": 280000,
+    "work_hours.start": 8,
+    "work_hours.end": 18
+  }
+}

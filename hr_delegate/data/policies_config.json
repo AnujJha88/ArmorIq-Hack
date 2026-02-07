@@ -1,0 +1,32 @@
+{
+  "salary_caps": {
+    "L3": 140000,
+    "L4": 180000,
+    "L5": 240000,
+    "L6": 320000
+  },
+  "work_hours": {
+    "start": 9,
+    "end": 17
+  },
+  "weekend_blocked": true,
+  "bias_terms": [
+    "rockstar",
+    "ninja",
+    "guru",
+    "young",
+    "energetic",
+    "digital native"
+  ],
+  "expense_limits": {
+    "travel": 5000,
+    "equipment": 2000,
+    "meals": 200
+  },
+  "pii_patterns": [
+    "ssn",
+    "social security",
+    "date of birth",
+    "dob"
+  ]
+}

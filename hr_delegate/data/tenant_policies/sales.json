@@ -1,0 +1,9 @@
+{
+  "name": "Sales",
+  "description": "Sales department policies",
+  "overrides": {
+    "weekend_blocked": false,
+    "work_hours.start": 8,
+    "work_hours.end": 19
+  }
+}
