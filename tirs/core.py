@@ -251,6 +251,79 @@ class TIRS:
         """Verify the audit chain integrity."""
         return self.audit.verify_chain()
 
+    def record_intent(
+        self,
+        agent_id: str,
+        action: str,
+        capabilities: List[str],
+        was_violation: bool = False
+    ):
+        """Simple interface to record an intent for drift tracking."""
+        self.verify_intent(
+            agent_id=agent_id,
+            intent_text=action,
+            capabilities=set(capabilities),
+            was_allowed=not was_violation,
+            policy_triggered="policy_violation" if was_violation else None
+        )
+
+    def get_risk_score(self, agent_id: str) -> float:
+        """Get current risk score for an agent."""
+        profile = self.drift_engine.profiles.get(agent_id)
+        if not profile:
+            return 0.0
+        return profile.current_risk_score
+
+    def get_risk_level(self, agent_id: str) -> RiskLevel:
+        """Get current risk level for an agent based on score."""
+        score = self.get_risk_score(agent_id)
+        thresholds = self.drift_engine.thresholds
+        if score >= thresholds.kill:
+            return RiskLevel.KILL
+        elif score >= thresholds.pause:
+            return RiskLevel.PAUSE
+        elif score >= thresholds.warning:
+            return RiskLevel.WARNING
+        return RiskLevel.OK
+
+    def get_drift_history(self, agent_id: str) -> List[Dict]:
+        """Get drift score history for an agent."""
+        profile = self.drift_engine.profiles.get(agent_id)
+        if not profile:
+            return []
+
+        # Return risk history
+        history = []
+        risk_scores = profile.risk_history[-10:] if profile.risk_history else [0.0]
+
+        for i, score in enumerate(risk_scores):
+            history.append({
+                "time": f"{9 + i}:00",
+                "score": score
+            })
+
+        if not history:
+            history.append({
+                "time": datetime.now().strftime("%H:%M"),
+                "score": profile.current_risk_score
+            })
+
+        return history
+
+    def get_audit_log(self, limit: int = 50) -> List[Dict]:
+        """Get recent audit log entries."""
+        entries = self.audit.entries[-limit:] if hasattr(self.audit, 'entries') else []
+        return [
+            {
+                "id": i,
+                "time": e.timestamp.strftime("%H:%M:%S") if hasattr(e, 'timestamp') else "00:00:00",
+                "agent": e.agent_id if hasattr(e, 'agent_id') else "unknown",
+                "event": e.event_type.value if hasattr(e, 'event_type') else "unknown",
+                "details": str(e.data)[:100] if hasattr(e, 'data') else ""
+            }
+            for i, e in enumerate(reversed(entries))
+        ]
+
     def export_audit(self, filepath: str):
         """Export the audit ledger to JSON."""
         self.audit.export_json(filepath)
