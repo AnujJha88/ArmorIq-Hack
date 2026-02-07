@@ -14,6 +14,10 @@ Components:
 
 __version__ = "0.1.0"
 
+# Direct imports for convenience
+from .core import TIRS, TIRSResult, get_tirs
+from .drift_engine import RiskLevel, AgentStatus
+
 # Lazy imports to avoid circular dependencies
 def get_tirs():
     from .core import get_tirs as _get_tirs

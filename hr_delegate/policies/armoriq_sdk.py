@@ -1,11 +1,11 @@
 """
 ArmorIQ SDK Integration for HR Swarm
 ====================================
-This wraps the real ArmorIQ SDK for Intent Authentication Protocol (IAP).
+Real ArmorIQ SDK integration with Intent Authentication Protocol (IAP).
 
 ArmorIQ Flow:
-1. capture_plan() - Define what the agent wants to do
-2. get_intent_token() - Get cryptographically signed token from ArmorIQ
+1. capture_plan() - Define what the agent wants to do (CSRG format)
+2. get_intent_token() - Get cryptographically signed token from ArmorIQ IAP
 3. invoke() - Execute action through ArmorIQ proxy with verification
 
 Install: pip install armoriq-sdk
@@ -18,7 +18,7 @@ import json
 import logging
 from typing import Dict, Tuple, Optional, List, Any
 from datetime import datetime
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 
 logging.basicConfig(level=logging.INFO, format='[ArmorIQ] %(levelname)s: %(message)s')
@@ -26,26 +26,30 @@ armoriq_logger = logging.getLogger("ArmorIQ")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# ARMORIQ SDK INTEGRATION
+# CONFIGURATION
 # ═══════════════════════════════════════════════════════════════════════════════
 
 ARMORIQ_API_KEY = os.getenv("ARMORIQ_API_KEY")
-ARMORIQ_USER_ID = os.getenv("USER_ID", "hr-swarm-demo")
-ARMORIQ_AGENT_ID = os.getenv("AGENT_ID", "hr-agent")
+ARMORIQ_IAP_ENDPOINT = os.getenv("ARMORIQ_IAP_ENDPOINT", "https://iap.armoriq.ai")
+ARMORIQ_PROXY_ENDPOINT = os.getenv("ARMORIQ_PROXY_ENDPOINT", "https://proxy.armoriq.ai")
+ARMORIQ_USER_ID = os.getenv("ARMORIQ_USER_ID", "hr-swarm-demo")
+ARMORIQ_AGENT_ID = os.getenv("ARMORIQ_AGENT_ID", "hr-agent")
 
-# Try to import armored client
+# Try to import ArmorIQ SDK
 try:
     from armoriq_sdk import (
-        ArmorIQClient, 
-        IntentMismatchException, 
+        ArmorIQClient,
+        IntentMismatchException,
         InvalidTokenException,
+        TokenExpiredException,
+        MCPInvocationException,
         PlanCapture,
         IntentToken
     )
-    ARMORIQ_SDK_INSTALLED = True
-    armoriq_logger.info("✓ armoriq-sdk package found")
+    ARMORIQ_SDK_AVAILABLE = True
+    armoriq_logger.info("✓ armoriq-sdk v0.2.6 loaded")
 except ImportError:
-    ARMORIQ_SDK_INSTALLED = False
+    ARMORIQ_SDK_AVAILABLE = False
     armoriq_logger.warning("⚠️  armoriq-sdk not installed. Run: pip install armoriq-sdk")
 
 
@@ -64,283 +68,463 @@ class IntentResult:
     reason: str
     policy_triggered: Optional[str] = None
     modified_payload: Optional[Dict] = None
+    token: Optional[Any] = None  # IntentToken when using real SDK
+    plan_hash: Optional[str] = None
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LOCAL POLICY ENGINE (Demo Mode)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class LocalPolicyEngine:
+    """
+    Local policy engine for demo mode.
+    Simulates ArmorIQ policy enforcement when SDK credentials unavailable.
+    """
+
+    POLICIES = {
+        "work_life_balance": {
+            "name": "Work-Life Balance",
+            "description": "No scheduling outside work hours (9-5) or weekends",
+            "work_hours": (9, 17),
+        },
+        "salary_caps": {
+            "name": "Salary Caps",
+            "description": "Enforce role-based salary limits",
+            "bands": {
+                "L3": {"min": 100000, "max": 140000},
+                "L4": {"min": 140000, "max": 180000},
+                "L5": {"min": 180000, "max": 240000},
+            }
+        },
+        "pii_protection": {
+            "name": "PII Protection",
+            "description": "Redact PII in external communications",
+            "patterns": [
+                r"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b",  # Phone
+                r"\b\d{3}[-]?\d{2}[-]?\d{4}\b",    # SSN
+            ]
+        },
+        "inclusive_language": {
+            "name": "Inclusive Language",
+            "description": "Block non-inclusive terminology",
+            "blocked_terms": ["rockstar", "ninja", "guru", "guys", "manpower", "salesman"]
+        },
+        "fraud_prevention": {
+            "name": "Fraud Prevention",
+            "description": "Require receipts for expenses over threshold",
+            "receipt_threshold": 50
+        },
+        "right_to_work": {
+            "name": "Right-to-Work",
+            "description": "Verify I-9 before onboarding",
+            "i9_required": True
+        }
+    }
+
+    def evaluate(self, action: str, payload: Dict) -> IntentResult:
+        """Evaluate action against local policies."""
+        intent_id = f"LOCAL-{datetime.now().strftime('%H%M%S')}-{id(payload) % 10000:04d}"
+
+        # Work-Life Balance
+        if action in ["schedule_interview", "book_meeting"]:
+            time_str = payload.get("time", payload.get("datetime", ""))
+            result = self._check_work_hours(intent_id, time_str)
+            if result:
+                return result
+
+        # Salary Caps
+        if action in ["generate_offer", "create_offer", "make_offer"]:
+            result = self._check_salary_cap(intent_id, payload)
+            if result:
+                return result
+
+        # Inclusive Language & PII
+        if action in ["send_email", "send_message", "send_outreach"]:
+            result = self._check_communication(intent_id, payload)
+            if result:
+                return result
+
+        # Fraud Prevention
+        if action in ["approve_expense", "submit_expense", "process_reimbursement"]:
+            result = self._check_expense(intent_id, payload)
+            if result:
+                return result
+
+        # Right-to-Work
+        if action in ["onboard_employee", "start_onboarding", "hire"]:
+            result = self._check_right_to_work(intent_id, payload)
+            if result:
+                return result
+
+        return IntentResult(intent_id, True, PolicyVerdict.ALLOW, "Policy check passed", None, payload)
+
+    def _check_work_hours(self, intent_id: str, time_str: str) -> Optional[IntentResult]:
+        if not time_str:
+            return None
+        try:
+            dt = datetime.strptime(time_str, "%Y-%m-%d %H:%M")
+            policy = self.POLICIES["work_life_balance"]
+
+            if dt.weekday() >= 5:
+                return IntentResult(intent_id, False, PolicyVerdict.DENY,
+                    f"Weekend scheduling blocked ({dt.strftime('%A')})",
+                    policy["name"])
+
+            h = policy["work_hours"]
+            if not (h[0] <= dt.hour < h[1]):
+                return IntentResult(intent_id, False, PolicyVerdict.DENY,
+                    f"Outside work hours ({h[0]}:00-{h[1]}:00)",
+                    policy["name"])
+        except ValueError:
+            pass
+        return None
+
+    def _check_salary_cap(self, intent_id: str, payload: Dict) -> Optional[IntentResult]:
+        role = payload.get("role", "")
+        salary = payload.get("salary", 0)
+        policy = self.POLICIES["salary_caps"]
+        bands = policy["bands"]
+
+        if role in bands:
+            band = bands[role]
+            if salary > band["max"]:
+                return IntentResult(intent_id, False, PolicyVerdict.DENY,
+                    f"Salary ${salary:,} exceeds ${band['max']:,} cap for {role}",
+                    policy["name"])
+        return None
+
+    def _check_communication(self, intent_id: str, payload: Dict) -> Optional[IntentResult]:
+        body = payload.get("body", payload.get("message", ""))
+        recipient = payload.get("recipient", payload.get("to", ""))
+
+        # Check inclusive language
+        policy = self.POLICIES["inclusive_language"]
+        for term in policy["blocked_terms"]:
+            if term.lower() in body.lower():
+                return IntentResult(intent_id, False, PolicyVerdict.DENY,
+                    f"Non-inclusive term detected: '{term}'",
+                    policy["name"])
+
+        # PII redaction for external emails
+        if recipient and not recipient.endswith("@company.com"):
+            pii_policy = self.POLICIES["pii_protection"]
+            modified_body = body
+            pii_found = False
+
+            for pattern in pii_policy["patterns"]:
+                if re.search(pattern, modified_body):
+                    modified_body = re.sub(pattern, "[REDACTED]", modified_body)
+                    pii_found = True
+
+            if pii_found:
+                mod_payload = payload.copy()
+                mod_payload["body"] = modified_body
+                return IntentResult(intent_id, True, PolicyVerdict.MODIFY,
+                    "PII redacted for external recipient",
+                    pii_policy["name"], mod_payload)
+
+        return None
+
+    def _check_expense(self, intent_id: str, payload: Dict) -> Optional[IntentResult]:
+        amount = payload.get("amount", 0)
+        has_receipt = payload.get("has_receipt", payload.get("receipt", False))
+        policy = self.POLICIES["fraud_prevention"]
+
+        if amount > policy["receipt_threshold"] and not has_receipt:
+            return IntentResult(intent_id, False, PolicyVerdict.DENY,
+                f"Receipt required for expenses over ${policy['receipt_threshold']}",
+                policy["name"])
+        return None
+
+    def _check_right_to_work(self, intent_id: str, payload: Dict) -> Optional[IntentResult]:
+        i9_status = payload.get("i9_status", payload.get("i9", ""))
+        policy = self.POLICIES["right_to_work"]
+
+        if i9_status != "verified":
+            return IntentResult(intent_id, False, PolicyVerdict.DENY,
+                "I-9 verification required before onboarding",
+                policy["name"])
+        return None
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ARMORIQ WRAPPER (Main Interface)
+# ═══════════════════════════════════════════════════════════════════════════════
 
 class ArmorIQWrapper:
     """
     ArmorIQ SDK Wrapper for HR Swarm
     =================================
-    
-    LIVE MODE (API key set):
+
+    LIVE MODE (with API key):
         Uses real ArmorIQ SDK with cryptographic Intent Authentication Protocol.
-        All actions go through ArmorIQ's IAP for verification.
-        
+        All actions verified through ArmorIQ's IAP before execution.
+
     DEMO MODE (no API key):
-        Uses local policy engine for hackathon demonstrations.
+        Uses local policy engine for demonstrations.
         Simulates ArmorIQ behavior with configurable policies.
-    
-    Required Environment Variables for LIVE mode:
-        ARMORIQ_API_KEY - Get from https://platform.armoriq.ai/dashboard/api-keys
-        USER_ID - Your user identifier
-        AGENT_ID - Your agent identifier
+
+    Environment Variables:
+        ARMORIQ_API_KEY - Your ArmorIQ API key (ak_live_* or ak_test_*)
+        ARMORIQ_IAP_ENDPOINT - IAP endpoint (default: https://iap.armoriq.ai)
+        ARMORIQ_PROXY_ENDPOINT - Proxy endpoint (default: https://proxy.armoriq.ai)
+        ARMORIQ_USER_ID - User identifier
+        ARMORIQ_AGENT_ID - Agent identifier
+
+    Get API Key: https://platform.armoriq.ai/dashboard/api-keys
     """
-    
-    def __init__(self, 
+
+    def __init__(self,
                  api_key: str = None,
                  user_id: str = None,
                  agent_id: str = None,
+                 iap_endpoint: str = None,
+                 proxy_endpoint: str = None,
                  project_id: str = "hr-swarm"):
-        
+
         self.project_id = project_id
         self.api_key = api_key or ARMORIQ_API_KEY
         self.user_id = user_id or ARMORIQ_USER_ID
         self.agent_id = agent_id or ARMORIQ_AGENT_ID
+        self.iap_endpoint = iap_endpoint or ARMORIQ_IAP_ENDPOINT
+        self.proxy_endpoint = proxy_endpoint or ARMORIQ_PROXY_ENDPOINT
+
         self.audit_log: List[Dict] = []
         self._intent_counter = 0
-        
-        # Initialize real SDK if credentials available
-        if ARMORIQ_SDK_INSTALLED and self.api_key:
-            try:
-                self.client = ArmorIQClient(
-                    api_key=self.api_key,
-                    user_id=self.user_id,
-                    agent_id=self.agent_id
-                )
-                self.mode = "LIVE"
-                armoriq_logger.info(f"🛡️  ArmorIQ LIVE MODE")
-                armoriq_logger.info(f"   User: {self.user_id}, Agent: {self.agent_id}")
-            except Exception as e:
-                armoriq_logger.warning(f"⚠️  ArmorIQ SDK init failed: {e}")
-                armoriq_logger.info(f"   Falling back to DEMO mode")
-                self.client = None
-                self.mode = "DEMO"
-        else:
-            self.client = None
-            self.mode = "DEMO"
-            armoriq_logger.info(f"🛡️  ArmorIQ DEMO MODE | Project: {project_id}")
+        self.client = None
+        self.mode = "DEMO"
+
+        # Try to initialize real ArmorIQ SDK
+        if ARMORIQ_SDK_AVAILABLE and self.api_key:
+            if self.api_key.startswith("ak_live_") or self.api_key.startswith("ak_test_"):
+                try:
+                    self.client = ArmorIQClient(
+                        api_key=self.api_key,
+                        iap_endpoint=self.iap_endpoint,
+                        proxy_endpoint=self.proxy_endpoint,
+                        user_id=self.user_id,
+                        agent_id=self.agent_id
+                    )
+                    self.mode = "LIVE"
+                    armoriq_logger.info("═" * 60)
+                    armoriq_logger.info("  🛡️  ArmorIQ LIVE MODE - Intent Authentication Active")
+                    armoriq_logger.info("═" * 60)
+                    armoriq_logger.info(f"  IAP Endpoint: {self.iap_endpoint}")
+                    armoriq_logger.info(f"  User: {self.user_id}")
+                    armoriq_logger.info(f"  Agent: {self.agent_id}")
+                    armoriq_logger.info("═" * 60)
+                except Exception as e:
+                    armoriq_logger.warning(f"⚠️  ArmorIQ SDK init failed: {e}")
+                    armoriq_logger.info("   Falling back to DEMO mode")
+            else:
+                armoriq_logger.warning(f"⚠️  Invalid API key format. Must start with 'ak_live_' or 'ak_test_'")
+
+        if self.mode == "DEMO":
+            armoriq_logger.info("═" * 60)
+            armoriq_logger.info("  🛡️  ArmorIQ DEMO MODE - Local Policy Engine")
+            armoriq_logger.info("═" * 60)
+            armoriq_logger.info(f"  Project: {project_id}")
             if not self.api_key:
-                armoriq_logger.info(f"   Set ARMORIQ_API_KEY for live mode")
-                armoriq_logger.info(f"   Get key: https://platform.armoriq.ai/dashboard/api-keys")
-        
-        self._local_policies = self._load_local_policies()
+                armoriq_logger.info("  Set ARMORIQ_API_KEY for live mode")
+                armoriq_logger.info("  Get key: https://platform.armoriq.ai/dashboard/api-keys")
+            armoriq_logger.info("═" * 60)
 
-    def _load_local_policies(self) -> Dict:
-        """Local policies for DEMO mode."""
-        return {
-            "scheduling": {"name": "Work-Life Balance", "work_hours": (9, 17)},
-            "financial": {"name": "Salary Caps", "bands": {"L3": 140000, "L4": 180000, "L5": 240000}},
-            "communication": {"name": "PII Protection", "bias_terms": ["rockstar", "ninja", "guru", "guys"]},
-            "expense": {"name": "Fraud Prevention", "receipt_threshold": 50},
-            "legal": {"name": "Right-to-Work", "i9_required": True},
-            "hipaa": {"name": "Medical Privacy", "redact": ["surgery", "cancer", "pregnancy"]}
-        }
+        self._local_engine = LocalPolicyEngine()
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # ARMORIQ INTENT VERIFICATION (Main Entry Point)
+    # MAIN INTENT VERIFICATION API
     # ═══════════════════════════════════════════════════════════════════════════
 
-    def capture_intent(self, action_type: str, payload: Dict, agent_name: str) -> IntentResult:
+    def capture_intent(self, action_type: str, payload: Dict, agent_name: str = None) -> IntentResult:
         """
-        ╔═══════════════════════════════════════════════════════════════════════╗
-        ║  A R M O R I Q   I N T E N T   V E R I F I C A T I O N                ║
-        ╠═══════════════════════════════════════════════════════════════════════╣
-        ║  Every agent action goes through ArmorIQ before execution.            ║
-        ║  LIVE: Cryptographic verification via ArmorIQ IAP                     ║
-        ║  DEMO: Local policy engine for hackathon demo                         ║
-        ╚═══════════════════════════════════════════════════════════════════════╝
+        Verify an intent through ArmorIQ before execution.
+
+        Args:
+            action_type: The action to perform (e.g., "send_email", "generate_offer")
+            payload: Action parameters
+            agent_name: Name of the agent making the request
+
+        Returns:
+            IntentResult with verdict (ALLOW, DENY, or MODIFY)
         """
         self._intent_counter += 1
-        intent_id = f"ARMOR-{self.project_id}-{self._intent_counter:06d}"
-        
-        # Pretty logging
-        armoriq_logger.info(f"╔{'═'*65}╗")
-        armoriq_logger.info(f"║  🛡️  ARMORIQ INTENT VERIFICATION                               ║")
-        armoriq_logger.info(f"╠{'═'*65}╣")
-        armoriq_logger.info(f"║  ID:     {intent_id:<55}║")
-        armoriq_logger.info(f"║  Agent:  {agent_name:<55}║")
-        armoriq_logger.info(f"║  Action: {action_type:<55}║")
-        armoriq_logger.info(f"║  Mode:   {self.mode:<55}║")
-        armoriq_logger.info(f"╠{'═'*65}╣")
-        
-        # LIVE mode: Use real ArmorIQ SDK
+        agent_name = agent_name or self.agent_id
+
+        # Log the verification attempt
+        self._log_verification_start(action_type, agent_name, payload)
+
+        # Use real SDK or local engine
         if self.mode == "LIVE" and self.client:
-            result = self._verify_with_armoriq(action_type, payload, agent_name, intent_id)
+            result = self._verify_with_armoriq(action_type, payload, agent_name)
         else:
-            # DEMO mode: Local policy evaluation
-            result = self._evaluate_locally(action_type, payload, intent_id)
-        
-        # Log verdict
-        if result.verdict == PolicyVerdict.DENY:
-            armoriq_logger.warning(f"║  🛑 VERDICT: DENIED                                            ║")
-            armoriq_logger.warning(f"║  Policy:  {str(result.policy_triggered)[:53]:<53}║")
-            armoriq_logger.warning(f"║  Reason:  {result.reason[:53]:<53}║")
-        elif result.verdict == PolicyVerdict.MODIFY:
-            armoriq_logger.info(f"║  ⚠️  VERDICT: MODIFIED                                          ║")
-            armoriq_logger.info(f"║  Policy:  {str(result.policy_triggered)[:53]:<53}║")
-        else:
-            armoriq_logger.info(f"║  ✅ VERDICT: ALLOWED                                            ║")
-        
-        armoriq_logger.info(f"╚{'═'*65}╝")
-        
-        self._record_audit(result, agent_name, action_type)
+            result = self._local_engine.evaluate(action_type, payload)
+
+        # Log the result
+        self._log_verification_result(result)
+        self._record_audit(result, agent_name, action_type, payload)
+
         return result
 
-    def _verify_with_armoriq(self, action_type: str, payload: Dict, 
-                              agent_name: str, intent_id: str) -> IntentResult:
-        """
-        LIVE MODE: Use real ArmorIQ SDK for cryptographic verification.
-        
-        ArmorIQ Flow:
-        1. capture_plan() - Define what we want to do
-        2. get_intent_token() - Get signed token from ArmorIQ IAP
-        3. Token allows action OR denies with policy violation
-        """
+    def _verify_with_armoriq(self, action: str, payload: Dict, agent_name: str) -> IntentResult:
+        """Use real ArmorIQ SDK for verification."""
+        intent_id = f"ARMOR-{datetime.now().strftime('%Y%m%d%H%M%S')}-{self._intent_counter:04d}"
+
         try:
-            # Build plan structure for ArmorIQ
-            plan = {
-                "goal": f"HR Agent {agent_name} executing {action_type}",
+            # Build the plan for ArmorIQ
+            plan_data = {
+                "goal": f"{agent_name} executing {action}",
                 "steps": [{
-                    "action": action_type,
                     "mcp": "hr-tools",
+                    "action": action,
                     "params": payload
                 }]
             }
-            
-            # Capture the plan with ArmorIQ
-            plan_capture = self.client.capture_plan(
-                llm="hr-agent",
-                prompt=f"Execute {action_type} for HR operations",
-                plan=plan
+
+            # Capture the plan
+            plan = self.client.capture_plan(
+                llm=agent_name,
+                prompt=f"Execute {action}: {json.dumps(payload)[:100]}"
             )
-            
-            # Get intent token (this is where policy enforcement happens)
-            token = self.client.get_intent_token(plan_capture)
-            
-            # If we got here, ArmorIQ approved the intent
+
+            # Get intent token (policy enforcement happens here)
+            token = self.client.get_intent_token(plan)
+
+            # If we got a token, the intent is approved
             return IntentResult(
-                intent_id=token.token_id or intent_id,
+                intent_id=token.token_id if hasattr(token, 'token_id') else intent_id,
                 allowed=True,
                 verdict=PolicyVerdict.ALLOW,
                 reason="ArmorIQ IAP approved",
-                modified_payload=payload
+                modified_payload=payload,
+                token=token,
+                plan_hash=token.plan_hash if hasattr(token, 'plan_hash') else None
             )
-            
+
         except IntentMismatchException as e:
             return IntentResult(
                 intent_id=intent_id,
                 allowed=False,
                 verdict=PolicyVerdict.DENY,
-                reason=str(e),
-                policy_triggered="ArmorIQ Policy"
+                reason=f"Intent mismatch: {str(e)}",
+                policy_triggered="ArmorIQ Intent Verification"
             )
         except InvalidTokenException as e:
             return IntentResult(
                 intent_id=intent_id,
                 allowed=False,
                 verdict=PolicyVerdict.DENY,
-                reason=str(e),
+                reason=f"Invalid token: {str(e)}",
                 policy_triggered="ArmorIQ Token Validation"
             )
+        except TokenExpiredException as e:
+            return IntentResult(
+                intent_id=intent_id,
+                allowed=False,
+                verdict=PolicyVerdict.DENY,
+                reason=f"Token expired: {str(e)}",
+                policy_triggered="ArmorIQ Token Expiry"
+            )
         except Exception as e:
-            armoriq_logger.warning(f"ArmorIQ SDK error: {e}, falling back to local")
-            return self._evaluate_locally(action_type, payload, intent_id)
+            armoriq_logger.warning(f"ArmorIQ error: {e}, falling back to local")
+            return self._local_engine.evaluate(action, payload)
 
-    def _evaluate_locally(self, action_type: str, payload: Dict, intent_id: str) -> IntentResult:
-        """DEMO MODE: Local policy evaluation."""
-        
-        # Scheduling Policy
-        if action_type == "schedule_interview":
-            time_str = payload.get("time", "")
+    def invoke(self, mcp: str, action: str, params: Dict, intent_token: Any = None) -> Dict:
+        """
+        Execute an action through ArmorIQ proxy (LIVE mode only).
+
+        In DEMO mode, simulates the invocation.
+        """
+        if self.mode == "LIVE" and self.client and intent_token:
             try:
-                dt = datetime.strptime(time_str, "%Y-%m-%d %H:%M")
-                if dt.weekday() >= 5:
-                    return IntentResult(intent_id, False, PolicyVerdict.DENY, 
-                                        "No interviews on weekends", "Work-Life Balance")
-                h = self._local_policies["scheduling"]["work_hours"]
-                if not (h[0] <= dt.hour < h[1]):
-                    return IntentResult(intent_id, False, PolicyVerdict.DENY,
-                                        f"Outside hours ({h[0]}-{h[1]})", "Work-Life Balance")
-            except ValueError:
-                pass
-        
-        # Financial Policy
-        if action_type == "generate_offer":
-            role, salary = payload.get("role", ""), payload.get("salary", 0)
-            cap = self._local_policies["financial"]["bands"].get(role, 100000)
-            if salary > cap:
-                return IntentResult(intent_id, False, PolicyVerdict.DENY,
-                                    f"${salary:,} exceeds ${cap:,} cap", "Salary Caps")
-        
-        # Communication Policy
-        if action_type == "send_email":
-            body = payload.get("body", "")
-            for term in self._local_policies["communication"]["bias_terms"]:
-                if term in body.lower():
-                    return IntentResult(intent_id, False, PolicyVerdict.DENY,
-                                        f"Non-inclusive: '{term}'", "PII Protection")
-            
-            # PII redaction for external
-            recipient = payload.get("recipient", "")
-            if not recipient.endswith("@company.com"):
-                redacted = re.sub(r"\d{3}[-.]?\d{3}[-.]?\d{4}", "[REDACTED]", body)
-                if redacted != body:
-                    mod = payload.copy()
-                    mod["body"] = redacted
-                    return IntentResult(intent_id, True, PolicyVerdict.MODIFY,
-                                        "PII redacted", "PII Protection", mod)
-        
-        # Expense Policy
-        if action_type == "approve_expense":
-            amt = payload.get("amount", 0)
-            thr = self._local_policies["expense"]["receipt_threshold"]
-            if amt > thr and not payload.get("has_receipt"):
-                return IntentResult(intent_id, False, PolicyVerdict.DENY,
-                                    f"Receipt required > ${thr}", "Fraud Prevention")
-        
-        # Legal Policy
-        if action_type == "onboard_employee":
-            if payload.get("i9_status") != "verified":
-                return IntentResult(intent_id, False, PolicyVerdict.DENY,
-                                    "I-9 required", "Right-to-Work")
-        
-        # HIPAA
-        if action_type == "file_leave_request":
-            notes = payload.get("medical_notes", "")
-            for term in self._local_policies["hipaa"]["redact"]:
-                if term in notes.lower():
-                    mod = payload.copy()
-                    mod["medical_notes"] = "[HIPAA_REDACTED]"
-                    return IntentResult(intent_id, True, PolicyVerdict.MODIFY,
-                                        "Medical info redacted", "Medical Privacy", mod)
-        
-        return IntentResult(intent_id, True, PolicyVerdict.ALLOW, "Approved", None, payload)
+                result = self.client.invoke(
+                    mcp=mcp,
+                    action=action,
+                    intent_token=intent_token,
+                    params=params,
+                    user_email=f"{self.user_id}@company.com"
+                )
+                return {"status": "success", "result": result}
+            except MCPInvocationException as e:
+                return {"status": "error", "error": str(e)}
+        else:
+            # Demo mode: simulate success
+            return {
+                "status": "success",
+                "mode": "demo",
+                "action": action,
+                "params": params,
+                "timestamp": datetime.now().isoformat()
+            }
 
-    def _record_audit(self, result: IntentResult, agent: str, action: str):
+    # ═══════════════════════════════════════════════════════════════════════════
+    # LOGGING & AUDIT
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def _log_verification_start(self, action: str, agent: str, payload: Dict):
+        armoriq_logger.info(f"╔{'═'*65}╗")
+        armoriq_logger.info(f"║  🛡️  ARMORIQ INTENT VERIFICATION                               ║")
+        armoriq_logger.info(f"╠{'═'*65}╣")
+        armoriq_logger.info(f"║  Agent:  {agent:<55}║")
+        armoriq_logger.info(f"║  Action: {action:<55}║")
+        armoriq_logger.info(f"║  Mode:   {self.mode:<55}║")
+        armoriq_logger.info(f"╠{'═'*65}╣")
+
+    def _log_verification_result(self, result: IntentResult):
+        if result.verdict == PolicyVerdict.DENY:
+            armoriq_logger.warning(f"║  🛑 DENIED                                                      ║")
+            armoriq_logger.warning(f"║  Policy: {str(result.policy_triggered or 'N/A')[:54]:<54}║")
+            armoriq_logger.warning(f"║  Reason: {result.reason[:54]:<54}║")
+        elif result.verdict == PolicyVerdict.MODIFY:
+            armoriq_logger.info(f"║  ⚠️  MODIFIED                                                    ║")
+            armoriq_logger.info(f"║  Policy: {str(result.policy_triggered or 'N/A')[:54]:<54}║")
+            armoriq_logger.info(f"║  Reason: {result.reason[:54]:<54}║")
+        else:
+            armoriq_logger.info(f"║  ✅ ALLOWED                                                      ║")
+        armoriq_logger.info(f"╚{'═'*65}╝")
+
+    def _record_audit(self, result: IntentResult, agent: str, action: str, payload: Dict):
         self.audit_log.append({
             "intent_id": result.intent_id,
             "timestamp": datetime.now().isoformat(),
             "agent": agent,
             "action": action,
             "verdict": result.verdict.value,
-            "mode": self.mode
+            "policy": result.policy_triggered,
+            "reason": result.reason,
+            "mode": self.mode,
+            "plan_hash": result.plan_hash
         })
 
     def get_audit_report(self) -> Dict:
+        """Generate audit report summary."""
         total = len(self.audit_log)
         denied = sum(1 for e in self.audit_log if e["verdict"] == "DENY")
         modified = sum(1 for e in self.audit_log if e["verdict"] == "MODIFY")
+
+        by_policy = {}
+        for e in self.audit_log:
+            p = e.get("policy") or "None"
+            by_policy[p] = by_policy.get(p, 0) + 1
+
         return {
             "project": self.project_id,
             "mode": self.mode,
-            "total": total,
+            "total_intents": total,
             "allowed": total - denied - modified,
             "denied": denied,
-            "modified": modified
+            "modified": modified,
+            "by_policy": by_policy,
+            "audit_entries": self.audit_log[-10:]  # Last 10
         }
 
     def close(self):
+        """Close the ArmorIQ client connection."""
         if self.client:
-            self.client.close()
+            try:
+                self.client.close()
+            except:
+                pass
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -350,10 +534,18 @@ class ArmorIQWrapper:
 _armoriq: Optional[ArmorIQWrapper] = None
 
 def get_armoriq() -> ArmorIQWrapper:
+    """Get the global ArmorIQ wrapper instance."""
     global _armoriq
     if _armoriq is None:
         _armoriq = ArmorIQWrapper()
     return _armoriq
 
-# Backward compat
+def reset_armoriq():
+    """Reset the global instance (for testing)."""
+    global _armoriq
+    if _armoriq:
+        _armoriq.close()
+    _armoriq = None
+
+# Backward compatibility
 ComplianceEngine = ArmorIQWrapper
