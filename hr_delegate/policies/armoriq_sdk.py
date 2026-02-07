@@ -367,12 +367,12 @@ class ArmorIQWrapper:
         return result
 
     def _verify_with_armoriq(self, action: str, payload: Dict, agent_name: str) -> IntentResult:
-        """Use real ArmorIQ SDK for verification."""
+        """Use real ArmorIQ SDK for verification + local policy enforcement."""
         intent_id = f"ARMOR-{datetime.now().strftime('%Y%m%d%H%M%S')}-{self._intent_counter:04d}"
 
         try:
-            # Build the plan for ArmorIQ
-            plan_data = {
+            # Build the plan structure for ArmorIQ
+            plan_structure = {
                 "goal": f"{agent_name} executing {action}",
                 "steps": [{
                     "mcp": "hr-tools",
@@ -381,24 +381,56 @@ class ArmorIQWrapper:
                 }]
             }
 
-            # Capture the plan
+            # Capture the plan with explicit plan structure
             plan = self.client.capture_plan(
                 llm=agent_name,
-                prompt=f"Execute {action}: {json.dumps(payload)[:100]}"
+                prompt=f"Execute {action}: {json.dumps(payload)[:100]}",
+                plan=plan_structure
             )
 
-            # Get intent token (policy enforcement happens here)
+            # Get intent token (cryptographic verification)
             token = self.client.get_intent_token(plan)
+            token_id = token.token_id if hasattr(token, 'token_id') else intent_id
+            plan_hash = token.plan_hash if hasattr(token, 'plan_hash') else None
 
-            # If we got a token, the intent is approved
+            # ArmorIQ approved the intent structure - now apply local policy rules
+            # This combines cryptographic verification with business policy enforcement
+            local_result = self._local_engine.evaluate(action, payload)
+
+            if not local_result.allowed:
+                # Local policy denied - return with ArmorIQ token info
+                return IntentResult(
+                    intent_id=token_id,
+                    allowed=False,
+                    verdict=local_result.verdict,
+                    reason=local_result.reason,
+                    policy_triggered=local_result.policy_triggered,
+                    token=token,
+                    plan_hash=plan_hash
+                )
+
+            if local_result.verdict == PolicyVerdict.MODIFY:
+                # Local policy modified the payload
+                return IntentResult(
+                    intent_id=token_id,
+                    allowed=True,
+                    verdict=PolicyVerdict.MODIFY,
+                    reason=local_result.reason,
+                    policy_triggered=local_result.policy_triggered,
+                    modified_payload=local_result.modified_payload,
+                    token=token,
+                    plan_hash=plan_hash
+                )
+
+            # Both ArmorIQ and local policies approved
             return IntentResult(
-                intent_id=token.token_id if hasattr(token, 'token_id') else intent_id,
+                intent_id=token_id,
                 allowed=True,
                 verdict=PolicyVerdict.ALLOW,
-                reason="ArmorIQ IAP approved",
+                reason=f"ArmorIQ verified + policy passed",
                 modified_payload=payload,
                 token=token,
-                plan_hash=token.plan_hash if hasattr(token, 'plan_hash') else None
+                plan_hash=plan_hash
             )
 
         except IntentMismatchException as e:
