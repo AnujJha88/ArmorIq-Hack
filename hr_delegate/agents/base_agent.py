@@ -1,21 +1,31 @@
 """
-HR Agent Base Class with TIRS Integration
-==========================================
-All agents inherit from this and use ArmorIQ + TIRS for intent verification
-and temporal drift detection.
+HR Agent Base Class with LLM + ArmorIQ Integration
+===================================================
+All agents inherit from this and use:
+- LLM for reasoning and decision-making
+- ArmorIQ for intent verification and tool invocation
+- TIRS for temporal drift detection
 """
 
 import json
 import logging
 import sys
 import os
-from typing import Dict, List, Tuple, Set, Optional
+from typing import Dict, List, Tuple, Set, Optional, Any
 from datetime import datetime
 
 # Add paths for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from hr_delegate.policies.armoriq_sdk import ArmorIQWrapper, get_armoriq, PolicyVerdict
+
+# LLM Integration
+try:
+    from hr_delegate.llm_client import LLMClient, get_llm, LLMMode
+    LLM_AVAILABLE = True
+except ImportError:
+    LLM_AVAILABLE = False
+    LLMMode = None
 
 # TIRS Integration
 try:
@@ -30,33 +40,35 @@ except ImportError:
 logging.basicConfig(level=logging.INFO, format='[%(name)s] %(message)s')
 
 
-class MockCloveClient:
-    """Simulates Clove SDK for standalone operation."""
-    def connect(self): return True
-    def register_name(self, name): return {"success": True}
-    def disconnect(self): pass
-    def think(self, prompt): return {"success": True, "content": f"LLM Response..."}
-    def exec(self, cmd): return {"success": True, "stdout": "{}"}
-    def pause(self): return {"success": True}
-    def kill(self): return {"success": True}
-
-
 class HRAgent:
     """
-    Base HR Agent with ArmorIQ + TIRS Integration
-    ==============================================
+    Base HR Agent with LLM + ArmorIQ + TIRS Integration
+    =====================================================
+    
     Every agent action goes through:
-    1. ArmorIQ - Policy verification
-    2. TIRS - Temporal drift detection & plan simulation
+    1. LLM - Reasoning and decision-making
+    2. ArmorIQ - Policy verification + tool invocation
+    3. TIRS - Temporal drift detection & plan simulation
+    
+    Key methods:
+    - reason(question): Ask LLM to reason about something
+    - decide(options): Ask LLM to choose between options
+    - plan(goal): Ask LLM to create a plan
+    - execute_tool(mcp, action, params): Execute tool through ArmorIQ
     """
 
     def __init__(self, name: str, primary_intent: str):
         self.name = name
         self.primary_intent = primary_intent
         self.logger = logging.getLogger(name)
-        self.clove = MockCloveClient()
+        
+        # LLM: Get the LLM client for reasoning
+        self.llm = get_llm() if LLM_AVAILABLE else None
+        if self.llm:
+            mode = self.llm.mode.value if hasattr(self.llm.mode, 'value') else 'unknown'
+            self.logger.info(f"🤖 LLM enabled ({mode} mode)")
 
-        # ARMORIQ: Get the shared client
+        # ARMORIQ: Get the shared client for intent verification + tool invocation
         self.armoriq = get_armoriq()
 
         # TIRS: Get temporal intent risk engine
@@ -70,14 +82,10 @@ class HRAgent:
         self._killed = False
 
     def start(self):
-        if not self.clove.connect():
-            self.logger.error("Failed to connect to Clove")
-            sys.exit(1)
         self.is_connected = True
         self.logger.info(f"🟢 {self.name} Agent ONLINE")
 
     def stop(self):
-        self.clove.disconnect()
         self.is_connected = False
         self.logger.info(f"🔴 {self.name} Agent OFFLINE")
 
@@ -233,9 +241,175 @@ class HRAgent:
     def execute_with_compliance(self, intent_type: str, payload: Dict, description: str) -> Tuple[bool, str, Dict]:
         return self.execute_with_armoriq(intent_type, payload, description)
 
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # LLM-POWERED REASONING METHODS
+    # ═══════════════════════════════════════════════════════════════════════════════
+
     def think(self, prompt: str) -> str:
-        """Ask the LLM for reasoning."""
-        return self.clove.think(prompt).get("content", "")
+        """Ask the LLM for reasoning (legacy method, use reason() instead)."""
+        if self.llm:
+            response = self.llm.complete(prompt)
+            return response.content
+        return f"[No LLM] {prompt[:50]}..."
+
+    def reason(self, question: str, context: str = "") -> str:
+        """
+        Ask the LLM to reason about a question.
+        
+        Args:
+            question: The question to reason about
+            context: Additional context for the LLM
+            
+        Returns:
+            LLM's reasoning as a string
+        """
+        if not self.llm:
+            return f"[No LLM available] Question: {question}"
+        
+        agent_context = f"""You are the {self.name} agent in an HR system.
+Your primary function is: {self.primary_intent}
+
+{context}"""
+        
+        response = self.llm.reason(agent_context, question)
+        self.logger.info(f"🧠 LLM Reasoning: {response.content[:100]}...")
+        return response.content
+
+    def decide(self, options: List[str], context: str = "", criteria: str = None) -> Dict[str, Any]:
+        """
+        Ask the LLM to choose between options.
+        
+        Args:
+            options: List of options to choose from
+            context: Situation/context
+            criteria: Optional decision criteria
+            
+        Returns:
+            Dict with 'choice' (index), 'option' (text), and 'reasoning'
+        """
+        if not self.llm:
+            return {"choice": 0, "option": options[0], "reasoning": "No LLM - defaulting to first option"}
+        
+        agent_context = f"""You are the {self.name} agent.
+Primary function: {self.primary_intent}
+
+{context}"""
+        
+        decision = self.llm.decide(agent_context, options, criteria)
+        self.logger.info(f"🎯 LLM Decision: Option {decision['choice']+1} - {decision['option'][:50]}")
+        return decision
+
+    def plan(self, goal: str, available_tools: List[str] = None) -> List[Dict]:
+        """
+        Ask the LLM to create a plan to achieve a goal.
+        
+        Args:
+            goal: The goal to achieve
+            available_tools: List of available tool names
+            
+        Returns:
+            List of planned action dicts
+        """
+        if not self.llm:
+            return []
+        
+        # Default tools based on agent type
+        if available_tools is None:
+            available_tools = ["email", "calendar", "hris", "offer", "payroll"]
+        
+        context = f"You are the {self.name} agent. Primary function: {self.primary_intent}"
+        
+        plan = self.llm.plan_actions(goal, available_tools, context)
+        self.logger.info(f"📋 LLM Plan: {len(plan)} steps to achieve: {goal[:50]}")
+        return plan
+
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # TOOL EXECUTION THROUGH ARMORIQ
+    # ═══════════════════════════════════════════════════════════════════════════════
+
+    def execute_tool(self, mcp: str, action: str, params: Dict, description: str = None) -> Dict[str, Any]:
+        """
+        Execute a tool through ArmorIQ's invoke() proxy.
+        
+        This is the PROPER way to execute tools in an agentic system:
+        1. Agent decides to use a tool (via LLM or programmatically)
+        2. ArmorIQ verifies the intent and gets a token
+        3. Tool is executed through ArmorIQ.invoke()
+        4. Result is returned to agent
+        
+        Args:
+            mcp: MCP name (e.g., "email", "calendar", "hris")
+            action: Action to perform (e.g., "send", "book", "lookup")
+            params: Parameters for the action
+            description: Human-readable description of what we're doing
+            
+        Returns:
+            Dict with 'success', 'result', and optional 'error'
+        """
+        # Check if agent can continue
+        can_continue, reason = self.check_status()
+        if not can_continue:
+            return {"success": False, "error": reason}
+        
+        # Build intent type
+        intent_type = f"{mcp}.{action}"
+        desc = description or f"{self.name} executing {intent_type}"
+        
+        self.logger.info(f"🔧 Executing tool: {intent_type}")
+        
+        # Step 1: Verify intent with ArmorIQ
+        result = self.armoriq.capture_intent(intent_type, params, self.name)
+        
+        # Step 2: Track with TIRS
+        if self.tirs:
+            capabilities = self._extract_capabilities(intent_type, params)
+            risk_score, risk_level = self.tirs.verify_intent(
+                agent_id=self.name,
+                intent_text=desc,
+                capabilities=capabilities,
+                was_allowed=result.allowed,
+                policy_triggered=result.policy_triggered
+            )
+            
+            if risk_level == RiskLevel.KILL:
+                self._killed = True
+                return {"success": False, "error": "Agent killed by TIRS"}
+            elif risk_level == RiskLevel.PAUSE:
+                self._paused = True
+                return {"success": False, "error": "Agent paused by TIRS"}
+        
+        # Step 3: Check if allowed
+        if not result.allowed:
+            self.logger.warning(f"🛑 Tool blocked: {result.reason}")
+            return {"success": False, "error": result.reason, "policy": result.policy_triggered}
+        
+        # Step 4: Use modified payload if ArmorIQ modified it
+        final_params = result.modified_payload or params
+        
+        # Step 5: Execute through ArmorIQ.invoke()
+        self.logger.info(f"⚡ Invoking {mcp}.{action} through ArmorIQ...")
+        invoke_result = self.armoriq.invoke(
+            mcp=mcp,
+            action=action,
+            params=final_params,
+            intent_token=result.token
+        )
+        
+        # Log the action
+        self.action_log.append({
+            "timestamp": datetime.now().isoformat(),
+            "mcp": mcp,
+            "action": action,
+            "params": final_params,
+            "intent_id": result.intent_id,
+            "result": invoke_result
+        })
+        
+        if invoke_result.get("status") == "success":
+            self.logger.info(f"✅ Tool executed successfully")
+            return {"success": True, "result": invoke_result.get("result", invoke_result)}
+        else:
+            return {"success": False, "error": invoke_result.get("error", "Unknown error")}
 
     def get_audit_summary(self) -> Dict:
         return self.armoriq.get_audit_report()

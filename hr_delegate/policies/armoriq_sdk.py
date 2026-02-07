@@ -463,9 +463,10 @@ class ArmorIQWrapper:
 
     def invoke(self, mcp: str, action: str, params: Dict, intent_token: Any = None) -> Dict:
         """
-        Execute an action through ArmorIQ proxy (LIVE mode only).
+        Execute an action through ArmorIQ proxy.
 
-        In DEMO mode, simulates the invocation.
+        In LIVE mode: Routes through ArmorIQ's secure proxy.
+        In DEMO mode: Executes via local MCP stubs.
         """
         if self.mode == "LIVE" and self.client and intent_token:
             try:
@@ -480,14 +481,76 @@ class ArmorIQWrapper:
             except MCPInvocationException as e:
                 return {"status": "error", "error": str(e)}
         else:
-            # Demo mode: simulate success
-            return {
-                "status": "success",
-                "mode": "demo",
-                "action": action,
-                "params": params,
-                "timestamp": datetime.now().isoformat()
+            # DEMO mode: Execute via MCP stubs
+            armoriq_logger.info(f"⚡ Executing {mcp}.{action} via MCP stub...")
+            
+            try:
+                # Dynamically load the appropriate MCP stub
+                stub = self._get_mcp_stub(mcp)
+                
+                if stub:
+                    # Call the stub's execute method if available
+                    if hasattr(stub, 'execute'):
+                        result = stub.execute(action, params)
+                    else:
+                        # Fallback to simulate
+                        result = stub.simulate(action, params)
+                    
+                    return {
+                        "status": "success",
+                        "mode": "demo",
+                        "mcp": mcp,
+                        "action": action,
+                        "result": result,
+                        "timestamp": datetime.now().isoformat()
+                    }
+                else:
+                    # No stub found, simulate success
+                    return {
+                        "status": "success",
+                        "mode": "demo",
+                        "mcp": mcp,
+                        "action": action,
+                        "params": params,
+                        "result": {"simulated": True},
+                        "timestamp": datetime.now().isoformat()
+                    }
+            except Exception as e:
+                armoriq_logger.error(f"MCP execution error: {e}")
+                return {"status": "error", "error": str(e)}
+    
+    def _get_mcp_stub(self, mcp_name: str):
+        """Get the appropriate MCP stub for execution."""
+        # Lazy import to avoid circular dependencies
+        try:
+            from mcp_stubs import get_stub
+            
+            # Map common MCP names to stub names
+            stub_map = {
+                "email": "Email",
+                "calendar": "Calendar",
+                "hris": "HRIS",
+                "payroll": "Payroll",
+                "offer": "Offer",
+                "performance": "Performance",
+                # Also accept full names
+                "Email": "Email",
+                "Calendar": "Calendar",
+                "HRIS": "HRIS",
+                "Payroll": "Payroll",
+                "Offer": "Offer",
+                "Performance": "Performance"
             }
+            
+            stub_name = stub_map.get(mcp_name)
+            if stub_name:
+                return get_stub(stub_name)
+        except ImportError:
+            armoriq_logger.debug("MCP stubs not available")
+        except ValueError:
+            armoriq_logger.debug(f"No stub for MCP: {mcp_name}")
+        
+        return None
 
     # ═══════════════════════════════════════════════════════════════════════════
     # LOGGING & AUDIT
