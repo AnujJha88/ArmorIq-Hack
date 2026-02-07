@@ -19,6 +19,7 @@ import json
 import math
 
 from .embeddings import get_embedding_engine, cosine_similarity
+from .behavioral_fingerprint import get_fingerprint, BehavioralFingerprint
 
 logger = logging.getLogger("TIRS.Drift")
 
@@ -29,6 +30,32 @@ class RiskLevel(Enum):
     WARNING = "WARNING"
     PAUSE = "PAUSE"
     KILL = "KILL"
+
+
+class DriftCategory(Enum):
+    """
+    Categories of drift for precise alerting.
+    
+    Each category indicates a different type of behavioral deviation:
+    - SEMANTIC: Actions changing in meaning/purpose
+    - CAPABILITY: Using new/unusual capabilities
+    - TEMPORAL: Unusual timing patterns
+    - VELOCITY: Speed/rate changes
+    - ESCALATION: Privilege creep
+    """
+    NONE = "NONE"
+    SEMANTIC = "SEMANTIC"         # Intent meaning changed
+    CAPABILITY = "CAPABILITY"     # New/unusual capabilities
+    TEMPORAL = "TEMPORAL"         # Unusual timing
+    VELOCITY = "VELOCITY"         # Speed changes
+    ESCALATION = "ESCALATION"     # Privilege creep
+
+
+class AlertSeverity(Enum):
+    """Severity levels for drift alerts."""
+    INFO = "INFO"
+    WARNING = "WARNING"
+    CRITICAL = "CRITICAL"
 
 
 class AgentStatus(Enum):
@@ -48,6 +75,8 @@ class IntentRecord:
     capabilities: Set[str]
     was_allowed: bool
     policy_triggered: Optional[str] = None
+    drift_category: Optional[DriftCategory] = None
+    risk_contribution: Optional[Dict[str, float]] = None
 
     def to_dict(self) -> Dict:
         return {
@@ -56,7 +85,43 @@ class IntentRecord:
             "intent_text": self.intent_text,
             "capabilities": list(self.capabilities),
             "was_allowed": self.was_allowed,
-            "policy_triggered": self.policy_triggered
+            "policy_triggered": self.policy_triggered,
+            "drift_category": self.drift_category.value if self.drift_category else None
+        }
+
+
+@dataclass
+class DriftAlert:
+    """
+    Smart drift alert with explainability.
+    
+    Provides actionable information about detected drift.
+    """
+    alert_id: str
+    timestamp: datetime
+    agent_id: str
+    severity: AlertSeverity
+    drift_categories: List[DriftCategory]
+    risk_score: float
+    confidence: float
+    explanation: str  # Human-readable
+    evidence: List[Dict]  # Supporting data
+    suggested_action: str
+    acknowledged: bool = False
+    
+    def to_dict(self) -> Dict:
+        return {
+            "alert_id": self.alert_id,
+            "timestamp": self.timestamp.isoformat(),
+            "agent_id": self.agent_id,
+            "severity": self.severity.value,
+            "drift_categories": [c.value for c in self.drift_categories],
+            "risk_score": self.risk_score,
+            "confidence": self.confidence,
+            "explanation": self.explanation,
+            "evidence": self.evidence,
+            "suggested_action": self.suggested_action,
+            "acknowledged": self.acknowledged
         }
 
 
@@ -252,28 +317,102 @@ class DriftEngine:
 
     def _calculate_risk_score(self, profile: DriftProfile, new_intent: IntentRecord) -> float:
         """
-        Calculate risk score from multiple signals.
+        Calculate risk score from multiple signals with drift categorization.
 
         Components:
-        1. Embedding drift - distance from behavioral centroid
-        2. Capability surprisal - how unusual are the requested capabilities
+        1. Embedding drift - distance from behavioral centroid (SEMANTIC)
+        2. Capability surprisal - how unusual are the requested capabilities (CAPABILITY)
         3. Violation rate - recent policy violation frequency
+        4. Fingerprint-based drift (TEMPORAL, VELOCITY, ESCALATION)
+        
+        Returns:
+            Risk score and updates intent record with detected categories
         """
         # If this is the first intent, no drift possible
         if not profile.intent_history:
             return 0.1  # Small baseline risk
 
-        # 1. Embedding Drift (cosine distance from centroid)
+        detected_categories: List[DriftCategory] = []
+        category_contributions: Dict[str, float] = {}
+        explanations: List[str] = []
+
+        # Get behavioral fingerprint
+        fingerprint = get_fingerprint(profile.agent_id)
+
+        # 1. Embedding Drift (SEMANTIC)
         if profile.centroid is not None:
             embedding_drift = 1 - cosine_similarity(new_intent.embedding, profile.centroid)
+            category_contributions["semantic"] = embedding_drift
+            if embedding_drift > 0.3:
+                detected_categories.append(DriftCategory.SEMANTIC)
+                explanations.append(f"Semantic drift: {embedding_drift:.2f} from baseline")
         else:
             embedding_drift = 0.0
 
-        # 2. Capability Surprisal
+        # 2. Capability Surprisal (CAPABILITY)
         surprisal = self._calculate_surprisal(profile, new_intent.capabilities)
+        category_contributions["capability"] = surprisal
+        if surprisal > 0.4:
+            detected_categories.append(DriftCategory.CAPABILITY)
+            explanations.append(f"Unusual capabilities detected (surprisal: {surprisal:.2f})")
 
         # 3. Violation Rate
         violation_rate = profile.get_recent_violation_rate(window=10)
+        category_contributions["violation"] = violation_rate
+
+        # 4. Fingerprint-based drift checks
+        if fingerprint.learning_complete:
+            # Temporal drift
+            is_temporal, temporal_conf, temporal_exp = fingerprint.check_temporal_drift(new_intent.timestamp)
+            if is_temporal:
+                detected_categories.append(DriftCategory.TEMPORAL)
+                explanations.append(temporal_exp)
+                category_contributions["temporal"] = temporal_conf
+
+            # Capability drift from fingerprint
+            is_cap_drift, cap_conf, cap_exp = fingerprint.check_capability_drift(new_intent.capabilities)
+            if is_cap_drift and DriftCategory.CAPABILITY not in detected_categories:
+                detected_categories.append(DriftCategory.CAPABILITY)
+                explanations.append(cap_exp)
+
+            # Velocity drift
+            recent_timestamps = [r.timestamp for r in profile.intent_history[-10:]]
+            recent_timestamps.append(new_intent.timestamp)
+            is_velocity, vel_conf, vel_exp = fingerprint.check_velocity_drift(recent_timestamps)
+            if is_velocity:
+                detected_categories.append(DriftCategory.VELOCITY)
+                explanations.append(vel_exp)
+                category_contributions["velocity"] = vel_conf
+
+            # Escalation drift
+            is_escalation, esc_conf, esc_exp = fingerprint.check_escalation_drift(new_intent.capabilities)
+            if is_escalation:
+                detected_categories.append(DriftCategory.ESCALATION)
+                explanations.append(esc_exp)
+                category_contributions["escalation"] = esc_conf
+
+            # Sequence drift
+            if profile.intent_history:
+                prev_caps = list(profile.intent_history[-1].capabilities)
+                if prev_caps and new_intent.capabilities:
+                    prev_cap = prev_caps[0]
+                    curr_cap = list(new_intent.capabilities)[0]
+                    is_seq, seq_conf, seq_exp = fingerprint.check_sequence_drift(prev_cap, curr_cap)
+                    if is_seq:
+                        explanations.append(seq_exp)
+                        category_contributions["sequence"] = seq_conf
+        else:
+            # Still learning - record for fingerprint
+            fingerprint.record_action(
+                timestamp=new_intent.timestamp,
+                capabilities=new_intent.capabilities,
+                embedding=new_intent.embedding,
+                risk_score=0.1
+            )
+
+        # Store drift info in intent record
+        new_intent.drift_category = detected_categories[0] if detected_categories else DriftCategory.NONE
+        new_intent.risk_contribution = category_contributions
 
         # Weighted combination
         risk_score = (
@@ -281,6 +420,16 @@ class DriftEngine:
             self.thresholds.surprisal_weight * surprisal +
             self.thresholds.violation_weight * violation_rate
         )
+
+        # Add fingerprint-based contributions
+        for cat_name in ["temporal", "velocity", "escalation"]:
+            if cat_name in category_contributions:
+                risk_score += 0.1 * category_contributions[cat_name]
+
+        # Generate alert if significant drift detected
+        if detected_categories and risk_score > self.thresholds.warning:
+            self._generate_alert(profile, new_intent, detected_categories, 
+                               risk_score, explanations, category_contributions)
 
         # Clamp to [0, 1]
         return min(max(risk_score, 0.0), 1.0)
@@ -310,6 +459,108 @@ class DriftEngine:
         normalized = min(avg_surprisal / 7.0, 1.0)
 
         return normalized
+
+    def _generate_alert(self, 
+                       profile: DriftProfile,
+                       intent: IntentRecord,
+                       categories: List[DriftCategory],
+                       risk_score: float,
+                       explanations: List[str],
+                       contributions: Dict[str, float]) -> DriftAlert:
+        """
+        Generate a smart drift alert with explanation and suggested action.
+        """
+        self._alert_counter = getattr(self, '_alert_counter', 0) + 1
+        
+        # Determine severity
+        if risk_score >= self.thresholds.kill:
+            severity = AlertSeverity.CRITICAL
+        elif risk_score >= self.thresholds.pause:
+            severity = AlertSeverity.WARNING
+        else:
+            severity = AlertSeverity.INFO
+        
+        # Build human-readable explanation
+        primary_category = categories[0] if categories else DriftCategory.NONE
+        if explanations:
+            explanation = f"{primary_category.value} drift detected. " + " | ".join(explanations[:3])
+        else:
+            explanation = f"Risk score elevated to {risk_score:.2f}"
+        
+        # Build evidence
+        evidence = [
+            {"intent_id": intent.intent_id, "timestamp": intent.timestamp.isoformat()},
+            {"risk_contributions": contributions},
+            {"capabilities": list(intent.capabilities)},
+            {"recent_risk_history": profile.risk_history[-5:]}
+        ]
+        
+        # Suggest action based on severity and category
+        if severity == AlertSeverity.CRITICAL:
+            if DriftCategory.ESCALATION in categories:
+                suggested_action = "IMMEDIATE: Agent killed due to privilege escalation. Review audit trail."
+            else:
+                suggested_action = "IMMEDIATE: Agent killed. Review forensic snapshot and recent actions."
+        elif severity == AlertSeverity.WARNING:
+            if DriftCategory.VELOCITY in categories:
+                suggested_action = "Review action rate - consider rate limiting this agent."
+            elif DriftCategory.TEMPORAL in categories:
+                suggested_action = "Unusual timing detected - verify authorized operation."
+            else:
+                suggested_action = "Agent paused. Review recent behavior before resuming."
+        else:
+            suggested_action = "Monitor this agent - drift patterns emerging."
+        
+        # Calculate confidence (average of contributing factors)
+        confidence = sum(contributions.values()) / max(len(contributions), 1)
+        
+        alert = DriftAlert(
+            alert_id=f"ALERT-{datetime.now().strftime('%Y%m%d%H%M%S')}-{self._alert_counter:04d}",
+            timestamp=datetime.now(),
+            agent_id=profile.agent_id,
+            severity=severity,
+            drift_categories=categories,
+            risk_score=risk_score,
+            confidence=min(confidence, 1.0),
+            explanation=explanation,
+            evidence=evidence,
+            suggested_action=suggested_action
+        )
+        
+        # Store alert
+        if not hasattr(self, 'alerts'):
+            self.alerts: List[DriftAlert] = []
+        self.alerts.append(alert)
+        
+        # Log alert
+        log_method = logger.critical if severity == AlertSeverity.CRITICAL else logger.warning
+        log_method(f"🚨 DRIFT ALERT: {alert.alert_id}")
+        log_method(f"   Agent: {profile.agent_id} | Severity: {severity.value}")
+        log_method(f"   Categories: {[c.value for c in categories]}")
+        log_method(f"   {explanation}")
+        log_method(f"   Suggested: {suggested_action}")
+        
+        return alert
+
+    def get_alerts(self, agent_id: str = None, acknowledged: bool = None) -> List[Dict]:
+        """Get drift alerts, optionally filtered."""
+        alerts = getattr(self, 'alerts', [])
+        
+        if agent_id:
+            alerts = [a for a in alerts if a.agent_id == agent_id]
+        if acknowledged is not None:
+            alerts = [a for a in alerts if a.acknowledged == acknowledged]
+        
+        return [a.to_dict() for a in alerts]
+    
+    def acknowledge_alert(self, alert_id: str) -> bool:
+        """Mark an alert as acknowledged."""
+        for alert in getattr(self, 'alerts', []):
+            if alert.alert_id == alert_id:
+                alert.acknowledged = True
+                logger.info(f"Alert {alert_id} acknowledged")
+                return True
+        return False
 
     def _evaluate_risk_level(self, risk_score: float) -> RiskLevel:
         """Determine risk level from score."""
