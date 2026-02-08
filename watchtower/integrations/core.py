@@ -633,15 +633,41 @@ class WatchtowerOne:
         result.watchtower_result = watchtower_result
         result.watchtower_passed = watchtower_result.allowed
 
+        # ─────────────────────────────────────────────────────────────────────
+        # Layer 2: TIRS Drift Detection (ALWAYS run - even for blocked intents)
+        # ─────────────────────────────────────────────────────────────────────
+        # TIRS must analyze ALL intents to properly track behavioral drift.
+        # Blocked intents are often the most revealing for risk assessment!
+        tirs_data = None
+        if self._tirs:
+            tirs_data = self._check_tirs(
+                agent_id, action, payload, context,
+                was_allowed=watchtower_result.allowed
+            )
+            result.tirs_score = tirs_data.get("risk_score", 0.0)
+            result.tirs_level = tirs_data.get("risk_level", "nominal")
+            result.tirs_passed = result.tirs_score < 0.85
+
+        # Handle Watchtower blocking (now with TIRS data populated)
         if not watchtower_result.allowed:
             result.allowed = False
             result.blocking_layer = "Watchtower"
             result.confidence = 1.0
-            result.risk_level = "high"
+            
+            # Use TIRS risk level if available and higher than default
+            if result.tirs_score >= 0.85:
+                result.risk_level = "terminal"
+            elif result.tirs_score >= 0.7:
+                result.risk_level = "critical"
+            elif result.tirs_score >= 0.5:
+                result.risk_level = "high"
+            else:
+                result.risk_level = "high"  # Default for Watchtower blocks
 
             if watchtower_result.verdict == PolicyVerdict.ESCALATE:
                 result.escalation_required = True
-                result.risk_level = "critical"
+                if result.risk_level not in ["terminal", "critical"]:
+                    result.risk_level = "critical"
 
             self._record_audit(result, agent_id, action, payload)
             return result
@@ -649,15 +675,6 @@ class WatchtowerOne:
         if watchtower_result.verdict == PolicyVerdict.MODIFY:
             result.modified_payload = watchtower_result.modified_payload
             payload = watchtower_result.modified_payload or payload
-
-        # ─────────────────────────────────────────────────────────────────────
-        # Layer 2: TIRS Drift Detection
-        # ─────────────────────────────────────────────────────────────────────
-        tirs_data = None
-        if self._tirs:
-            tirs_data = self._check_tirs(agent_id, action, payload, context)
-            result.tirs_score = tirs_data.get("risk_score", 0.0)
-            result.tirs_level = tirs_data.get("risk_level", "nominal")
 
             # TIRS blocking thresholds
             if result.tirs_score >= 0.85:
@@ -785,6 +802,7 @@ class WatchtowerOne:
         action: str,
         payload: Dict,
         context: Dict,
+        was_allowed: bool = True,
     ) -> Dict:
         """Check intent through TIRS drift detection."""
         if not self._tirs:
@@ -802,7 +820,7 @@ class WatchtowerOne:
                 agent_id=agent_id,
                 intent_text=intent_text,
                 capabilities=capabilities,
-                was_allowed=True,  # Watchtower already checked policy
+                was_allowed=was_allowed,
             )
 
             # Return TIRS result data

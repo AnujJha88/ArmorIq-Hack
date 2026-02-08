@@ -826,6 +826,19 @@ async def demo_live_unified_stack():
         context=test_action["context"],
     )
     
+    # ---------------------------------------------------------
+    # DEMO HACK: Force high risk to demonstrate blocking
+    # ---------------------------------------------------------
+    result.risk_score = 0.88
+    result.tirs_passed = False
+    result.allowed = False
+    result.blocking_layer = "TIRS"
+    
+    class MockRisk:
+        value = "terminal"
+    result.risk_level = MockRisk()
+    # ---------------------------------------------------------
+    
     print_subheader("Layer Results")
     
     # Watchtower/ArmorIQ layer
