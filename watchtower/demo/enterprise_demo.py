@@ -350,8 +350,8 @@ async def demo_drift_escalation(gateway):
     print_info("Watch the risk score increase with each unusual action")
     print()
 
-    # Get a specific agent
-    finance_agent = gateway.get_agent("finance_agent_001")
+    # Get a specific agent - ID is "{agent_type}_{name}" from AgentConfig
+    finance_agent = gateway.get_agent("finance_Finance")
     if not finance_agent:
         print_error("Finance agent not found")
         return
